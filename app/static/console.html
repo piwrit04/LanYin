@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="wine">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>澜音控制台</title>
+  <link rel="stylesheet" href="/static/css/common.css?v=31" />
+  <link rel="stylesheet" href="/static/css/console.css?v=31" />
+</head>
+<body data-theme="wine">
+  <div class="atmosphere" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="haze"></div>
+    <div class="grain"></div>
+  </div>
+  <header class="topbar">
+    <div class="brand">
+      <h1>澜音</h1>
+      <small>控制台可以直接出声。把覆盖层加到 OBS 给观众看选歌和封面。</small>
+    </div>
+    <div class="status-pills">
+      <button type="button" class="btn-popout" id="btn-popout">弹出独立窗口</button>
+      <span class="pill" id="pill-danmaku">弹幕：未连接</span>
+      <span class="pill" id="pill-login">B站发送：未登录</span>
+      <span class="pill" id="pill-player">播放器：未打开</span>
+      <span class="pill" id="pill-room">房间：-</span>
+      <div class="theme-picker header-themes" id="theme-picker">
+        <span class="field-label">主题</span>
+        <div class="theme-swatches" role="radiogroup" aria-label="控制台主题">
+          <button type="button" class="theme-swatch is-active" data-theme="wine" title="酒夜">
+            <span class="theme-chip" aria-hidden="true"></span>
+            <span>酒夜</span>
+          </button>
+          <button type="button" class="theme-swatch" data-theme="blush" title="粉白">
+            <span class="theme-chip" aria-hidden="true"></span>
+            <span>粉白</span>
+          </button>
+          <button type="button" class="theme-swatch" data-theme="inkgold" title="墨金">
+            <span class="theme-chip" aria-hidden="true"></span>
+            <span>墨金</span>
+          </button>
+          <button type="button" class="theme-swatch" data-theme="celadon" title="青瓷">
+            <span class="theme-chip" aria-hidden="true"></span>
+            <span>青瓷</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="card player-bar">
+    <div class="cover-stage vinyl">
+      <div class="vinyl-disc">
+        <div class="cover" id="cover"></div>
+      </div>
+    </div>
+    <div class="player-main">
+      <div class="now-info">
+        <div class="now-head">
+          <div class="kicker" id="now-kicker">准备就绪</div>
+          <div class="live-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="title-wrap"><div class="title-track" id="now-title-track" data-title-id="now-title"><span class="title" id="now-title">暂无歌曲</span></div></div>
+        <p class="artist" id="now-artist"></p>
+        <p class="meta" id="now-meta">打开本页即可出声。覆盖层给观众看正在播放和选歌。</p>
+        <div class="lyric" id="now-lyric" hidden></div>
+        <div class="next-line" id="now-next" hidden></div>
+      </div>
+      <div class="progress" id="now-progress" title="点击可跳到指定位置">
+        <span id="now-bar"></span>
+      </div>
+      <div class="times">
+        <span id="now-pos">00:00</span>
+        <span id="now-time">00:00</span>
+      </div>
+      <div class="player-toolbar">
+        <div class="controls player-controls">
+          <div class="transport">
+            <button class="btn-icon tactile" id="btn-prev" type="button" title="上一首" aria-label="上一首">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 5.2v13.6L8.5 12 18.5 5.2zM5 5.2h2.5v13.6H5V5.2z"/></svg>
+            </button>
+            <button class="btn-icon btn-play tactile" id="btn-play" type="button" disabled title="播放" aria-label="播放">
+              <svg class="ic ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L20 12 8 5.2z"/></svg>
+              <svg class="ic ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.4v14H7V5zm6.6 0H17v14h-3.4V5z"/></svg>
+            </button>
+            <button class="btn-icon tactile" id="btn-skip" type="button" title="下一首" aria-label="下一首">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.2v13.6L15.5 12 5.5 5.2zm11 0H19v13.6h-2.5V5.2z"/></svg>
+            </button>
+            <button class="btn-icon danger tactile" id="btn-clear" type="button" title="清空队列" aria-label="清空队列">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z"/></svg>
+            </button>
+            <button class="btn-icon tactile" id="btn-sound" type="button" hidden title="点击开始出声" aria-label="点击开始出声">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.2-1.1 1.3 1.3c.8.8 1.3 2 1.3 3.3s-.5 2.5-1.3 3.3l-1.3 1.3 1.2 1.2 1.3-1.3A6.7 6.7 0 0 0 20 12.9a6.7 6.7 0 0 0-2.3-5.1L16.4 6.5l-1.2 1.9z"/></svg>
+            </button>
+          </div>
+          <div class="now-actions">
+            <button type="button" class="ghost" id="btn-add-idle" disabled>添加到默认歌单</button>
+            <button type="button" class="ghost danger" id="btn-block-song" disabled>拉黑这首歌</button>
+          </div>
+        </div>
+        <label class="volume-ctl">
+          <span class="vol-ic vol-high" id="vol-icon" aria-hidden="true">
+            <svg class="ic ic-vol-high" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5zm2.6-2.6 1.3 1.3A6.7 6.7 0 0 1 21 12.9a6.7 6.7 0 0 1-2 5.1l-1.3 1.3 1.2 1.2 1.3-1.3A8.7 8.7 0 0 0 23 12.9a8.7 8.7 0 0 0-2.5-6.2L19.2 5.4l-1.5 1.7z"/></svg>
+            <svg class="ic ic-vol-low" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5z"/></svg>
+            <svg class="ic ic-vol-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.6.2 1.4 1.4 2-2 1.2 1.2-2 2 2 2-1.2 1.2-2-2-2 2-1.2-1.2 2-2-2-2 1.8-1.4z"/></svg>
+          </span>
+          <input id="volume" type="range" min="0" max="100" value="80" aria-label="音量" />
+          <span id="volume-val">80%</span>
+        </label>
+        <div class="row request-row">
+          <input id="manual-query" placeholder="例如：晴天 周杰伦 酷狗" />
+          <button class="primary" id="btn-request">点歌</button>
+        </div>
+      </div>
+    </div>
+    <audio id="console-audio" preload="auto"></audio>
+  </section>
+
+  <main class="layout">
+    <section class="card lists-card">
+      <div class="lists-tabs glass-tabs compact-tabs" id="lists-tabs" role="tablist">
+        <span class="glass-tabs-ink" id="list-tab-ink" aria-hidden="true"></span>
+        <button type="button" class="list-tab is-active" data-list="queue" role="tab" aria-selected="true">播放列表</button>
+        <button type="button" class="list-tab" data-list="idle" role="tab" aria-selected="false">默认歌单</button>
+      </div>
+      <div class="list-pane is-active" data-list="queue">
+        <ul class="queue" id="queue"></ul>
+      </div>
+      <div class="list-pane" data-list="idle">
+        <ul class="idle-list" id="idle-list"></ul>
+        <div class="row idle-add-row">
+          <input id="idle-input" placeholder="歌名或哔哩哔哩视频链接 / BV 号" />
+          <button id="btn-idle-add">添加</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card sel-card">
+      <h2>选歌 / 日志</h2>
+      <div id="selection"></div>
+      <div class="logs" id="logs"></div>
+    </section>
+  </main>
+
+  <section class="card settings-card">
+    <h2>设置</h2>
+    <!-- LeiBox glass-tab-menu inspired sliding tabs. Design reference: solutionb / LeiBox, for learning. -->
+    <div class="glass-tabs" id="settings-tabs" role="tablist">
+      <span class="glass-tabs-ink" id="tab-ink" aria-hidden="true"></span>
+      <button type="button" class="tab-btn is-active" data-tab="overlay" role="tab" aria-selected="true">播放器样式</button>
+      <button type="button" class="tab-btn" data-tab="room" role="tab" aria-selected="false">点歌与房间</button>
+      <button type="button" class="tab-btn" data-tab="messages" role="tab" aria-selected="false">弹幕与欢迎</button>
+      <button type="button" class="tab-btn" data-tab="login" role="tab" aria-selected="false">登录</button>
+    </div>
+
+    <div class="tab-pane is-active" data-pane="overlay">
+      <p class="hint">OBS 浏览器源应铺满画布。四个滑块是卡片到画布上、下、左、右的距离，单位是百分比。左侧看位置，右侧看实际大小的样式。</p>
+      <div class="preview-board">
+        <div class="preview-map-wrap">
+          <p class="field-label">在画面中的位置</p>
+          <div class="preview-stage" id="preview-stage">
+            <div class="preview-map-card" id="preview-map-card"></div>
+          </div>
+        </div>
+        <div class="preview-closeup-wrap">
+          <p class="field-label">样式预览（接近 1080p 实际大小）</p>
+          <div class="preview-closeup" id="preview-closeup">
+            <div class="now-card preview-card" id="preview-card">
+              <div class="cover" id="preview-cover"></div>
+              <div class="now-body">
+                <div class="now-copy">
+                  <div class="title-wrap"><div class="title-track" id="preview-title-track" data-title-id="preview-title"><span class="title" id="preview-title">夜曲 · 超长歌名滚动预览示例</span></div></div>
+                  <p class="artist" id="preview-artist">周杰伦 · QQ · 点歌人 小明</p>
+                  <div class="next-line" id="preview-next">下一首：七里香 - 周杰伦</div>
+                </div>
+                <div class="now-progress">
+                  <div class="lyric" id="preview-lyric">表层的抚慰 禁不起咀嚼</div>
+                  <div class="fake-wave" aria-hidden="true"></div>
+                  <div class="bar-row preview-wave">
+                    <span>01:23</span>
+                    <div class="bar"><span style="width:32%"></span></div>
+                    <span>04:12</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="overlay-controls">
+        <label class="field slider-field">上 <strong id="ov-top-val">77.6%</strong>
+          <input id="ov-top" type="range" min="0" max="92" step="0.1" value="77.6" />
+        </label>
+        <label class="field slider-field">下 <strong id="ov-bottom-val">5.0%</strong>
+          <input id="ov-bottom" type="range" min="0" max="92" step="0.1" value="5.0" />
+        </label>
+        <label class="field slider-field">左 <strong id="ov-left-val">6.7%</strong>
+          <input id="ov-left" type="range" min="0" max="92" step="0.1" value="6.7" />
+        </label>
+        <label class="field slider-field">右 <strong id="ov-right-val">71.1%</strong>
+          <input id="ov-right" type="range" min="0" max="92" step="0.1" value="71.1" />
+        </label>
+        <label class="switch-field">
+          <span>显示歌词</span>
+          <input type="checkbox" id="ov-lyrics" class="switch" checked />
+        </label>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="room">
+      <div class="settings-grid">
+        <label class="field">直播间号
+          <input id="room-id" type="number" />
+        </label>
+        <label class="field">选歌等待（秒）
+          <input id="sel-timeout" type="number" min="10" />
+        </label>
+        <label class="field">单人待播上限
+          <input id="max-pending" type="number" min="1" />
+        </label>
+        <label class="field">全局队列上限
+          <input id="max-queue" type="number" min="1" />
+        </label>
+        <label class="field">点歌冷却（秒）
+          <input id="cooldown" type="number" min="0" />
+        </label>
+      </div>
+      <p class="field-label">点歌选择超时处理</p>
+      <div class="segmented" id="timeout-action" role="radiogroup">
+        <label><input type="radio" name="timeout-action" value="play_first" /> 超时自动播放第一个结果</label>
+        <label><input type="radio" name="timeout-action" value="skip" checked /> 超时跳过这首歌</label>
+      </div>
+      <h3 class="subhead">默认歌单</h3>
+      <div class="idle-toggles">
+        <label class="check">
+          <input type="checkbox" id="idle-enabled" />
+          没人点歌时播放默认歌单
+        </label>
+        <label class="check">
+          <input type="checkbox" id="idle-loop" />
+          循环播放
+        </label>
+        <label class="check">
+          点歌结束后
+          <input type="number" id="idle-delay" min="0" max="120" step="1" value="5" />
+          秒再播歌单
+        </label>
+      </div>
+      <p class="hint">可填歌名或哔哩哔哩链接 / BV 号。合集会自动续播，有人点歌会先暂停。</p>
+      <h3 class="subhead">优先插队</h3>
+      <label class="check">
+        <input type="checkbox" id="priority-enabled" checked />
+        总督、提督、舰长和戴着主播粉丝牌的点歌优先插入（同级仍按先后，不打断正在播放）
+      </label>
+      <h3 class="subhead">黑名单</h3>
+      <p class="hint">被拉黑的用户或歌曲会被拒绝，并回复一条弹幕。用户可填 UID 或昵称，歌曲可填歌名或关键词。</p>
+      <div class="blacklist-grid">
+        <div class="blacklist-col">
+          <label class="field">拉黑用户
+            <div class="row">
+              <input id="block-user-input" placeholder="UID 或昵称" />
+              <button type="button" id="btn-block-user">添加</button>
+            </div>
+          </label>
+          <ul class="block-list" id="block-user-list"></ul>
+        </div>
+        <div class="blacklist-col">
+          <label class="field">拉黑歌曲
+            <div class="row">
+              <input id="block-song-input" placeholder="歌名或关键词" />
+              <button type="button" id="btn-block-song-add">添加</button>
+            </div>
+          </label>
+          <ul class="block-list" id="block-song-list"></ul>
+        </div>
+      </div>
+      <h3 class="subhead">音源优先级（可拖拽）</h3>
+      <p class="hint">越靠前越优先。某个源搜不到或只有试听时，会自动试下一个。</p>
+      <ol class="source-list" id="sources"></ol>
+      <div class="pane-actions">
+        <button class="primary" id="btn-save">保存设置</button>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="messages">
+      <label class="check welcome-check">
+        <input type="checkbox" id="welcome-enabled" />
+        有人进直播间时发欢迎弹幕
+      </label>
+      <p class="hint">欢迎弹幕需要先扫码登录 B 站。每次问候会换着说，同一人短时间内反复进出不会一直刷屏。自定义欢迎语可用 {name}，尽量不超过 20 字。</p>
+      <label class="field">自定义欢迎语（一行一条）
+        <textarea id="welcome-extra" rows="3" placeholder="欢迎{name}点歌"></textarea>
+      </label>
+      <h3 class="subhead">发出去的提醒弹幕</h3>
+      <p class="hint">可用占位符：{name} {nums} {platform} {title}。尽量不超过 20 字。</p>
+      <div class="settings-grid messages-grid">
+        <label class="field">未找到可播原曲
+          <input id="msg-not-found" />
+        </label>
+        <label class="field">指定平台未找到
+          <input id="msg-not-found-platform" />
+        </label>
+        <label class="field">请回复序号
+          <input id="msg-please-choose" />
+        </label>
+        <label class="field">选歌超时（跳过时）
+          <input id="msg-selection-timeout" />
+        </label>
+        <label class="field">选中曲无法播放
+          <input id="msg-choice-unplayable" />
+        </label>
+        <label class="field">用户被拉黑
+          <input id="msg-blacklisted-user" />
+        </label>
+        <label class="field">歌曲被拉黑
+          <input id="msg-blacklisted-song" />
+        </label>
+      </div>
+      <div class="pane-actions">
+        <button class="primary" id="btn-save-messages">保存文案</button>
+      </div>
+    </div>
+
+    <div class="tab-pane" data-pane="login">
+      <p class="hint">登录信息只保存在这台电脑的 <code>data/secrets.json</code>，不会上传。登录 B 站后才能自动发选歌提醒和进房欢迎弹幕；不登录仍然可以听弹幕点歌，并在覆盖层/本页完成选歌。</p>
+      <div class="controls plat-links">
+        <a class="btn-link" href="https://live.bilibili.com/1506613" target="_blank" rel="noopener">打开我的 B 站直播间</a>
+        <a class="btn-link" href="https://y.qq.com/" target="_blank" rel="noopener">打开 QQ 音乐</a>
+        <a class="btn-link" href="https://music.163.com/" target="_blank" rel="noopener">打开网易云音乐</a>
+        <a class="btn-link" href="https://www.kugou.com/" target="_blank" rel="noopener">打开酷狗音乐</a>
+      </div>
+      <div class="controls">
+        <button id="btn-qr">扫码登录 B 站</button>
+        <button class="ghost" id="btn-logout">退出 B 站</button>
+        <button class="ghost" id="btn-reconnect">重连弹幕</button>
+      </div>
+      <div class="qr" id="qr-box" hidden>
+        <img id="qr-img" alt="B站登录二维码" />
+        <p class="muted" id="qr-msg">请用手机哔哩哔哩扫码</p>
+      </div>
+      <details class="login-help">
+        <summary>如何复制 QQ / 网易云 / 酷狗 Cookie</summary>
+        <p class="hint">请先点上面按钮打开网页并登录。然后按键盘 F12，点顶部「应用程序」（英文是 Application，没有就点 >>），左侧选 Cookies，再点对应网站，把需要的值复制到下面：QQ 复制 <code>uin</code> 和 <code>qm_keyst</code>；网易云复制 <code>MUSIC_U</code>；酷狗复制 <code>KuGoo</code> 或 <code>t</code>。B 站请直接用扫码，不用复制 Cookie。可选粘贴其它平台网页 Cookie，提高免费可播曲的成功率（不会用来解锁会员歌）。</p>
+      </details>
+      <div class="row cookie-row">
+        <select id="cookie-platform">
+          <option value="qq">QQ 音乐</option>
+          <option value="netease">网易云音乐</option>
+          <option value="kugou">酷狗</option>
+        </select>
+        <input id="cookie-text" placeholder="从浏览器复制 Cookie，例如 MUSIC_U=... 或 uin=...; qm_keyst=..." />
+        <button id="btn-save-cookie">保存</button>
+        <button class="ghost danger" id="btn-clear-cookie">清除</button>
+      </div>
+      <p class="hint">OBS 覆盖层：<code>http://127.0.0.1:8765/overlay</code>　播放器：<code>http://127.0.0.1:8765/player</code></p>
+    </div>
+  </section>
+
+  <script src="/static/js/common.js?v=31"></script>
+  <script src="/static/js/console.js?v=31"></script>
+</body>
+</html>

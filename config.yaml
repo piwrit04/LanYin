@@ -1,0 +1,26 @@
+# 澜音本地配置（不含登录凭证，凭证保存在 data/secrets.json）
+room_id: 1506613
+host: 127.0.0.1
+port: 8765
+
+# 音源优先级（从上到下，越靠前越优先）。可在控制台拖拽修改。
+sources_priority:
+  - qq
+  - qishui
+  - kugou
+  - bili
+  - netease
+
+# 多个像样结果时，等待点歌人回复序号的秒数
+selection_timeout_seconds: 30
+
+# 防刷
+anti_spam:
+  max_pending_per_user: 2    # 同一观众同时待播上限（不含正在播的）
+  max_queue_size: 30         # 全局队列上限
+  cooldown_seconds: 60       # 同一观众两次点歌最短间隔（秒）
+
+# 弹幕指令
+commands:
+  request_prefix: 点歌
+  cancel: 撤回

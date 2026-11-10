@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>澜音覆盖层</title>
+  <link rel="stylesheet" href="/static/css/common.css?v=31" />
+  <link rel="stylesheet" href="/static/css/overlay.css?v=31" />
+</head>
+<body>
+  <div class="stage">
+    <section class="now-card" id="now-card">
+      <div class="cover-stage vinyl">
+        <div class="vinyl-disc">
+          <div class="cover" id="cover"></div>
+        </div>
+      </div>
+      <div class="now-body">
+        <div class="now-copy">
+          <div class="kicker" id="kicker">正在播放</div>
+          <div class="title-wrap"><div class="title-track" id="title-track" data-title-id="title"><span class="title" id="title">等待点歌</span></div></div>
+          <p class="artist" id="artist"></p>
+          <p class="meta" id="meta"></p>
+          <div class="next-line" id="next-line" hidden></div>
+        </div>
+        <div class="now-progress">
+          <div class="lyric" id="lyric"></div>
+          <canvas id="wave" width="280" height="28" aria-hidden="true"></canvas>
+          <div class="bar-row">
+            <span id="t0">00:00</span>
+            <div class="bar"><span id="bar"></span></div>
+            <span id="t1">00:00</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="queue-card" id="queue-card">
+      <h3>待播</h3>
+      <ul id="queue"></ul>
+    </section>
+    <div class="request-toast" id="request-toast" hidden>
+      <div class="toast-kicker">新的点歌</div>
+      <div class="toast-who" id="toast-who"></div>
+      <div class="toast-song" id="toast-song"></div>
+    </div>
+    <section class="select-card" id="select-card" hidden>
+      <p class="lead" id="sel-lead"></p>
+      <p class="sub" id="sel-sub"></p>
+      <ol id="sel-list"></ol>
+    </section>
+  </div>
+  <script src="/static/js/common.js?v=31"></script>
+  <script src="/static/js/overlay.js?v=31"></script>
+</body>
+</html>

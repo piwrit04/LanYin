@@ -1,0 +1,194 @@
+/* Ant Design 5 dark theme tokens (Alibaba), adapted for this control console.
+   https://ant.design/docs/spec/dark
+   Console-specific theme overrides live in console.css so the OBS overlay
+   and standalone player keep this shared baseline. */
+:root {
+  --ant-primary: #1668dc;
+  --ant-primary-hover: #3c89e8;
+  --ant-primary-active: #1554ad;
+  --ant-primary-bg: rgba(22, 104, 220, 0.18);
+  --bg: #141414;
+  --bg-soft: rgba(20, 20, 20, 0.86);
+  --panel: #1f1f1f;
+  --panel-strong: #141414;
+  --elevated: #262626;
+  --line: #424242;
+  --line-strong: #434343;
+  --text: rgba(255, 255, 255, 0.88);
+  --muted: rgba(255, 255, 255, 0.45);
+  --disabled: rgba(255, 255, 255, 0.25);
+  --amber: #d4b106;
+  --accent: var(--ant-primary);
+  --danger: #e84749;
+  --ok: #49aa19;
+  --shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.32), 0 9px 28px 0 rgba(0, 0, 0, 0.2);
+  --radius: 6px;
+  --radius-lg: 8px;
+  --font: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans SC", sans-serif;
+  --control-height: 32px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.5714;
+}
+button, input, select, textarea { font-family: inherit; font-size: 14px; }
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--elevated);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 15px;
+  height: var(--control-height);
+  line-height: 22px;
+  transition: all 0.2s;
+}
+button:hover { border-color: var(--ant-primary-hover); color: var(--ant-primary-hover); }
+button:disabled { cursor: not-allowed; color: var(--disabled); border-color: var(--line); }
+button.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+button.danger:hover { color: #ff7875; border-color: #ff7875; }
+button.ghost {
+  background: transparent;
+  border-color: var(--line);
+}
+button.primary {
+  background: var(--ant-primary);
+  border-color: var(--ant-primary);
+  color: #fff;
+}
+button.primary:hover { background: var(--ant-primary-hover); border-color: var(--ant-primary-hover); color: #fff; }
+input, select, textarea {
+  background: #141414;
+  border: 1px solid #424242;
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 11px;
+  height: var(--control-height);
+  outline: none;
+  min-width: 0;
+}
+textarea { height: auto; line-height: 1.5714; resize: vertical; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--ant-primary);
+  box-shadow: 0 0 0 2px rgba(22, 104, 220, 0.2);
+}
+.muted { color: var(--muted); }
+.ok { color: var(--ok); }
+.warn { color: #d89614; }
+.err { color: var(--danger); }
+
+.title-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+.title-track {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  white-space: nowrap;
+  width: max-content;
+  will-change: transform;
+}
+.title-track .title {
+  flex: 0 0 auto;
+}
+.title-track.is-marquee {
+  animation: title-marquee linear infinite;
+}
+.title-track.is-marquee .title {
+  padding-right: 2.4em;
+}
+@keyframes title-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* NetEase-style vinyl disc for now-playing covers */
+.cover-stage.vinyl {
+  position: relative;
+  flex: none;
+}
+.cover-stage.vinyl .vinyl-disc {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 57%, rgba(255, 255, 255, 0.08) 58.5%, transparent 61%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      #1a1a1a 0px,
+      #1a1a1a 1px,
+      #0c0c0c 2px,
+      #161616 3px,
+      #0a0a0a 4px
+    );
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 18px rgba(0, 0, 0, 0.55);
+}
+.cover-stage.vinyl.is-spinning .vinyl-disc {
+  animation: vinyl-spin 12s linear infinite;
+  will-change: transform;
+}
+.cover-stage.vinyl .cover {
+  position: absolute;
+  inset: 13%;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  z-index: 1;
+}
+.cover-stage.vinyl .vinyl-disc::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9%;
+  height: 9%;
+  min-width: 7px;
+  min-height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #cfcfcf, #4a4a4a 45%, #111 70%);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+  pointer-events: none;
+}
+.cover-stage.vinyl::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.06) 28%,
+    transparent 46%,
+    transparent 62%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes vinyl-spin {
+  to { transform: rotate(360deg); }
+}
+
