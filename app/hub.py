@@ -22,6 +22,7 @@ class Hub:
         self.selection: Optional[SelectionSession] = None
         self.danmaku_connected = False
         self.player_seen_at: float = 0.0
+        self._log_seq = 0
         self._lock = asyncio.Lock()
 
     def dedicated_player_connected(self) -> bool:
@@ -36,7 +37,10 @@ class Hub:
         return time.time() - self.player_seen_at < 8
 
     def log(self, level: str, message: str) -> None:
-        entry = {"level": level, "message": message, "ts": time.time()}
+        # 每条日志带单调递增的 id。log() 只是排队广播，紧跟着的 push_state()
+        # 往往先发出（快照里已含这条），客户端据 id 去重，避免同一行出现两次。
+        self._log_seq += 1
+        entry = {"id": self._log_seq, "level": level, "message": message, "ts": time.time()}
         self.logs.append(entry)
         asyncio.create_task(self.broadcast({"type": "log", "payload": entry}))
 

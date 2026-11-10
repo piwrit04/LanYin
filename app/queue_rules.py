@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
-VALID_THEMES = ("wine", "blush", "inkgold", "celadon")
-DEFAULT_THEME = "wine"
+VALID_THEMES = ("plain", "wine", "blush", "inkgold", "celadon")
+DEFAULT_THEME = "plain"
 
 # Lower number = higher priority. Regulars sit at 10.
 TIER_GOVERNOR = 0  # 总督 guard_level 1

@@ -4,17 +4,16 @@ SOURCE_OVERLAY = "澜音覆盖层"
 SOURCE_AUDIO = "澜音音频"
 OLD_SOURCE_OVERLAY = "点歌姬覆盖层"
 OLD_SOURCE_AUDIO = "点歌姬音频"
-CONSOLE_URL = "http://127.0.0.1:8765/"
-OVERLAY_URL = "http://127.0.0.1:8765/overlay"
-PLAYER_URL = "http://127.0.0.1:8765/player"
+CONSOLE_VERSION = "35"
+DEFAULT_PORT = 8765
 
 auto_start = true
 auto_stop = true
-auto_sources = false
 auto_popup = true
 loaded = false
 poll_count = 0
 launching_pid = nil
+owned_pending = false
 
 ffi = nil
 kernel32 = nil
@@ -80,17 +79,53 @@ function script_description()
 <p>覆盖层和音频<b>不会</b>自动加到场景里。需要时点下面的「把覆盖层和音频加到当前场景」。如果场景里已有旧的「点歌姬覆盖层」「点歌姬音频」，加载时会自动改名为「澜音覆盖层」「澜音音频」。</p>]]
 end
 
+-- 端口跟 config.yaml 走（默认 8765）。用户按 README 改了端口，覆盖层/音频地址也跟着变。
+function read_port()
+  local f = io.open(path_join(project_root(), "config.yaml"), "r")
+  if not f then
+    return DEFAULT_PORT
+  end
+  local text = f:read("*a") or ""
+  f:close()
+  for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+    local n = string.match(line, "^port%s*:%s*['\"]?(%d+)")
+    if n then
+      n = tonumber(n)
+      if n and n > 0 and n < 65536 then
+        return n
+      end
+    end
+  end
+  return DEFAULT_PORT
+end
+
+function base_url()
+  return "http://127.0.0.1:" .. tostring(read_port())
+end
+
+function overlay_url()
+  return base_url() .. "/overlay"
+end
+
+function player_url()
+  return base_url() .. "/player"
+end
+
+function console_url()
+  return base_url() .. "/window?v=" .. CONSOLE_VERSION
+end
+
 function script_defaults(settings)
   obs.obs_data_set_default_bool(settings, "auto_start", true)
   obs.obs_data_set_default_bool(settings, "auto_stop", true)
-  obs.obs_data_set_default_bool(settings, "auto_sources", false)
   obs.obs_data_set_default_bool(settings, "auto_popup", true)
 end
 
+-- 不再有「自动加到场景」开关：旧版本保存过的 auto_sources=true 也不会再生效，
+-- 覆盖层和音频只在点按钮时才加。
 function script_update(settings)
   auto_start = obs.obs_data_get_bool(settings, "auto_start")
   auto_stop = obs.obs_data_get_bool(settings, "auto_stop")
-  auto_sources = obs.obs_data_get_bool(settings, "auto_sources")
   auto_popup = obs.obs_data_get_bool(settings, "auto_popup")
 end
 
@@ -98,7 +133,6 @@ function script_properties()
   local props = obs.obs_properties_create()
   obs.obs_properties_add_bool(props, "auto_start", "打开 OBS 时自动启动澜音")
   obs.obs_properties_add_bool(props, "auto_stop", "关闭 OBS 时自动退出澜音")
-  obs.obs_properties_add_bool(props, "auto_sources", "启动时自动把覆盖层和音频加到当前场景")
   obs.obs_properties_add_bool(props, "auto_popup", "启动后自动弹出独立控制台窗口")
   obs.obs_properties_add_button(props, "btn_start", "立即启动澜音", on_start_clicked)
   obs.obs_properties_add_button(props, "btn_popout", "弹出独立控制台窗口", on_popout_clicked)
@@ -129,12 +163,10 @@ function on_frontend_event(event)
     if auto_start then
       start_server()
     end
-    if auto_sources then
-      ensure_sources()
-    end
   elseif event == obs.OBS_FRONTEND_EVENT_EXIT or event == obs.OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN then
     if auto_stop then
-      stop_server()
+      -- 只停 OBS 自己启动的那个；用 start.bat 单独开的本地版不受影响
+      stop_owned_server()
     end
   end
 end
@@ -244,10 +276,16 @@ function start_hidden(exe, args, cwd)
     return nil
   end
   local cmdline = '"' .. exe .. '" ' .. args
-  local wexe = to_wide(exe)
+  -- 不带路径的程序名（如 pythonw）要让 CreateProcessW 按 PATH 搜索：
+  -- lpApplicationName 必须传 NULL，否则它只在当前目录找、也不会补 .exe，必然失败。
+  local bare = not string.find(exe, "[\\/]")
+  local wexe = nil
+  if not bare then
+    wexe = to_wide(exe)
+  end
   local wcmd = to_wide(cmdline)
   local wcwd = to_wide(cwd)
-  if wexe == nil or wcmd == nil or wcwd == nil then
+  if (wexe == nil and not bare) or wcmd == nil or wcwd == nil then
     file_log("路径转换失败")
     return nil
   end
@@ -270,7 +308,7 @@ function start_hidden(exe, args, cwd)
   local flags = CREATE_NO_WINDOW + CREATE_NEW_PROCESS_GROUP + CREATE_BREAKAWAY_FROM_JOB
   local ok = kernel32.CreateProcessW(wexe, cmdbuf, nil, nil, 0, flags, nil, wcwd, si, pi)
   if ok == 0 then
-    file_log("启动失败，错误码 " .. tostring(kernel32.GetLastError()))
+    file_log("启动失败（" .. exe .. "），错误码 " .. tostring(kernel32.GetLastError()))
     return nil
   end
   local pid = tonumber(pi.dwProcessId)
@@ -336,13 +374,13 @@ function open_console_window()
   else
     exe = "pythonw"
   end
-  file_log("正在弹出独立控制台窗口")
+  file_log("正在弹出独立控制台窗口：" .. console_url())
   start_hidden(exe, '"' .. script .. '"', root)
 end
 
 function start_server()
   if server_is_up() then
-    file_log("澜音已经在运行")
+    file_log("澜音已经在运行（" .. base_url() .. "）")
     refresh_browser_sources()
     if auto_popup then
       open_console_window()
@@ -360,45 +398,99 @@ function start_server()
   local pythonw = path_join(root, ".venv\\Scripts\\pythonw.exe")
   local python = path_join(root, ".venv\\Scripts\\python.exe")
   local start_win = path_join(root, "start_win.py")
-  local exe, args
+  local candidates = {}
   if file_exists(pythonw) then
-    exe = pythonw
-    args = "-m app"
+    candidates = {pythonw}
   elseif file_exists(python) then
-    exe = python
-    args = "-m app"
-  else
-    -- First run: install env in the background, no console window
-    local sys_pythonw = "pythonw"
-    local sys_python = "python"
-    if file_exists("C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe") then
-      sys_pythonw = "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\pythonw.exe"
-    end
-    exe = sys_pythonw
+    candidates = {python}
+  end
+  local args = "-m app"
+  if #candidates == 0 then
+    -- 第一次运行：后台建环境、装依赖，不弹黑窗口
+    candidates = system_pythonw_candidates()
     args = '"' .. start_win .. '" --hidden'
     file_log("还没有运行环境，正在第一次安装，可能需要一两分钟")
   end
-  file_log("正在后台启动澜音：" .. exe .. " " .. args)
-  local pid = start_hidden(exe, args, root)
+  local pid = nil
+  for i = 1, #candidates do
+    file_log("正在后台启动澜音：" .. candidates[i] .. " " .. args)
+    pid = start_hidden(candidates[i], args, root)
+    if pid ~= nil then
+      break
+    end
+  end
   if pid == nil then
     file_log("启动失败。可先双击 start.bat 看是否有报错。")
     return
   end
   launching_pid = pid
   write_pid_file("launch.pid", pid)
+  owned_pending = true
   poll_count = 0
   obs.timer_remove(poll_ready)
   obs.timer_add(poll_ready, 800)
+end
+
+function system_pythonw_candidates()
+  local list = {}
+  local seen = {}
+  local function add(p)
+    if p and not seen[p] then
+      seen[p] = true
+      table.insert(list, p)
+    end
+  end
+  local bases = {}
+  local la = os.getenv("LOCALAPPDATA")
+  if la and la ~= "" then
+    table.insert(bases, la .. "\\Programs\\Python")
+  end
+  local pf = os.getenv("ProgramFiles")
+  if pf and pf ~= "" then
+    table.insert(bases, pf)
+  end
+  for _, b in ipairs(bases) do
+    for _, v in ipairs({"314", "313", "312", "311"}) do
+      local p = b .. "\\Python" .. v .. "\\pythonw.exe"
+      if file_exists(p) then
+        add(p)
+      end
+    end
+  end
+  add("pythonw")  -- 勾选了 Add Python to PATH
+  add("pyw")      -- Python 启动器
+  return list
+end
+
+-- 记录「这个澜音是 OBS 启动的」，脚本重载后也认得，关 OBS 时只停自己的。
+function mark_owned()
+  local pid = read_pid_file("server.pid")
+  if pid then
+    write_pid_file("obs-owned.pid", pid)
+  end
+end
+
+function stop_owned_server()
+  local owned = read_pid_file("obs-owned.pid")
+  local pid = read_pid_file("server.pid")
+  if owned and pid and owned == pid then
+    stop_server()
+  elseif owned_pending then
+    stop_server()  -- 还在启动中就关 OBS：停掉自己拉起来的进程
+  else
+    file_log("澜音不是 OBS 启动的（可能是 start.bat），关闭 OBS 时不去停它")
+  end
 end
 
 function poll_ready()
   poll_count = poll_count + 1
   if server_is_up() then
     file_log("澜音已启动")
-    refresh_browser_sources()
-    if auto_sources then
-      ensure_sources()
+    if owned_pending then
+      mark_owned()
+      owned_pending = false
     end
+    refresh_browser_sources()
     if auto_popup then
       open_console_window()
     end
@@ -427,9 +519,11 @@ function stop_server()
     kill_pid(lp)
   end
   launching_pid = nil
+  owned_pending = false
   -- also clear ready flags if still present
   local ready = path_join(project_root(), "data\\server.ready")
   os.remove(ready)
+  os.remove(path_join(project_root(), "data\\obs-owned.pid"))
 end
 
 function source_exists(name)
@@ -500,7 +594,7 @@ function ensure_sources()
     return
   end
 
-  local overlay = add_browser_source(SOURCE_OVERLAY, OVERLAY_URL, 1920, 1080, false)
+  local overlay = add_browser_source(SOURCE_OVERLAY, overlay_url(), 1920, 1080, false)
   if overlay ~= nil then
     if not scene_has_source(scene, SOURCE_OVERLAY) then
       obs.obs_scene_add(scene, overlay)
@@ -509,18 +603,19 @@ function ensure_sources()
     obs.obs_source_release(overlay)
   end
 
-  local audio = add_browser_source(SOURCE_AUDIO, PLAYER_URL, 320, 180, true)
+  local audio = add_browser_source(SOURCE_AUDIO, player_url(), 320, 180, true)
   if audio ~= nil then
     if not scene_has_source(scene, SOURCE_AUDIO) then
       local item = obs.obs_scene_add(scene, audio)
       if item ~= nil then
-        obs.obs_sceneitem_set_visible(item, false)
+        -- 不能把它设成不可见：OBS 里隐藏的来源不会进混音，直播就没声音了。
+        -- 保持可见，只挪到画布外面，观众看不到。
         local pos = obs.vec2()
         pos.x = -2000
         pos.y = -2000
         obs.obs_sceneitem_set_pos(item, pos)
       end
-      file_log("已在当前场景加入隐藏的「澜音音频」（请在混音器里调音量）")
+      file_log("已在当前场景加入「澜音音频」（放在画布外，观众看不到；请在混音器里调音量）")
     end
     obs.obs_source_release(audio)
   end
@@ -537,6 +632,15 @@ function refresh_browser_sources()
     if src ~= nil then
       local settings = obs.obs_source_get_settings(src)
       local url = obs.obs_data_get_string(settings, "url")
+      -- 改过端口后，把旧的 127.0.0.1:端口 地址换成当前端口
+      local want = (names[i] == SOURCE_OVERLAY) and overlay_url() or player_url()
+      local path = string.match(url or "", "^http://127%.0%.0%.1:%d+(/.*)$") or string.match(url or "", "^http://localhost:%d+(/.*)$")
+      if path then
+        local base_path = string.match(want, "^http://[^/]+(/[^?]*)")
+        if string.sub(path, 1, #base_path) == base_path then
+          url = base_url() .. path
+        end
+      end
       obs.obs_data_set_string(settings, "url", url)
       obs.obs_source_update(src, settings)
       obs.obs_data_release(settings)

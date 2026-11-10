@@ -1,152 +1,190 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="wine">
+<html lang="zh-CN" data-theme="plain">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音控制台</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=31" />
-  <link rel="stylesheet" href="/static/css/console.css?v=31" />
+  <link rel="stylesheet" href="/static/css/common.css?v=35" />
+  <link rel="stylesheet" href="/static/css/console.css?v=35" />
 </head>
-<body data-theme="wine">
-  <div class="atmosphere" aria-hidden="true">
-    <div class="orb orb-a"></div>
-    <div class="orb orb-b"></div>
-    <div class="orb orb-c"></div>
-    <div class="haze"></div>
-    <div class="grain"></div>
-  </div>
-  <header class="topbar">
-    <div class="brand">
-      <h1>澜音</h1>
-      <small>控制台可以直接出声。把覆盖层加到 OBS 给观众看选歌和封面。</small>
-    </div>
-    <div class="status-pills">
-      <button type="button" class="btn-popout" id="btn-popout">弹出独立窗口</button>
-      <span class="pill" id="pill-danmaku">弹幕：未连接</span>
-      <span class="pill" id="pill-login">B站发送：未登录</span>
-      <span class="pill" id="pill-player">播放器：未打开</span>
-      <span class="pill" id="pill-room">房间：-</span>
-      <div class="theme-picker header-themes" id="theme-picker">
-        <span class="field-label">主题</span>
-        <div class="theme-swatches" role="radiogroup" aria-label="控制台主题">
-          <button type="button" class="theme-swatch is-active" data-theme="wine" title="酒夜">
-            <span class="theme-chip" aria-hidden="true"></span>
-            <span>酒夜</span>
-          </button>
-          <button type="button" class="theme-swatch" data-theme="blush" title="粉白">
-            <span class="theme-chip" aria-hidden="true"></span>
-            <span>粉白</span>
-          </button>
-          <button type="button" class="theme-swatch" data-theme="inkgold" title="墨金">
-            <span class="theme-chip" aria-hidden="true"></span>
-            <span>墨金</span>
-          </button>
-          <button type="button" class="theme-swatch" data-theme="celadon" title="青瓷">
-            <span class="theme-chip" aria-hidden="true"></span>
-            <span>青瓷</span>
-          </button>
-        </div>
+<body data-theme="plain">
+  <div class="atmosphere" aria-hidden="true"></div>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img class="mark" src="/static/img/lanyin-mark.svg" alt="" width="28" height="28" />
+        <h1>澜音</h1>
       </div>
-    </div>
-  </header>
-
-  <section class="card player-bar">
-    <div class="cover-stage vinyl">
-      <div class="vinyl-disc">
-        <div class="cover" id="cover"></div>
-      </div>
-    </div>
-    <div class="player-main">
-      <div class="now-info">
-        <div class="now-head">
-          <div class="kicker" id="now-kicker">准备就绪</div>
-          <div class="live-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-        </div>
-        <div class="title-wrap"><div class="title-track" id="now-title-track" data-title-id="now-title"><span class="title" id="now-title">暂无歌曲</span></div></div>
-        <p class="artist" id="now-artist"></p>
-        <p class="meta" id="now-meta">打开本页即可出声。覆盖层给观众看正在播放和选歌。</p>
-        <div class="lyric" id="now-lyric" hidden></div>
-        <div class="next-line" id="now-next" hidden></div>
-      </div>
-      <div class="progress" id="now-progress" title="点击可跳到指定位置">
-        <span id="now-bar"></span>
-      </div>
-      <div class="times">
-        <span id="now-pos">00:00</span>
-        <span id="now-time">00:00</span>
-      </div>
-      <div class="player-toolbar">
-        <div class="controls player-controls">
-          <div class="transport">
-            <button class="btn-icon tactile" id="btn-prev" type="button" title="上一首" aria-label="上一首">
-              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 5.2v13.6L8.5 12 18.5 5.2zM5 5.2h2.5v13.6H5V5.2z"/></svg>
-            </button>
-            <button class="btn-icon btn-play tactile" id="btn-play" type="button" disabled title="播放" aria-label="播放">
-              <svg class="ic ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L20 12 8 5.2z"/></svg>
-              <svg class="ic ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.4v14H7V5zm6.6 0H17v14h-3.4V5z"/></svg>
-            </button>
-            <button class="btn-icon tactile" id="btn-skip" type="button" title="下一首" aria-label="下一首">
-              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.2v13.6L15.5 12 5.5 5.2zm11 0H19v13.6h-2.5V5.2z"/></svg>
-            </button>
-            <button class="btn-icon danger tactile" id="btn-clear" type="button" title="清空队列" aria-label="清空队列">
-              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z"/></svg>
-            </button>
-            <button class="btn-icon tactile" id="btn-sound" type="button" hidden title="点击开始出声" aria-label="点击开始出声">
-              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.2-1.1 1.3 1.3c.8.8 1.3 2 1.3 3.3s-.5 2.5-1.3 3.3l-1.3 1.3 1.2 1.2 1.3-1.3A6.7 6.7 0 0 0 20 12.9a6.7 6.7 0 0 0-2.3-5.1L16.4 6.5l-1.2 1.9z"/></svg>
-            </button>
-          </div>
-          <div class="now-actions">
-            <button type="button" class="ghost" id="btn-add-idle" disabled>添加到默认歌单</button>
-            <button type="button" class="ghost danger" id="btn-block-song" disabled>拉黑这首歌</button>
-          </div>
-        </div>
-        <label class="volume-ctl">
-          <span class="vol-ic vol-high" id="vol-icon" aria-hidden="true">
-            <svg class="ic ic-vol-high" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5zm2.6-2.6 1.3 1.3A6.7 6.7 0 0 1 21 12.9a6.7 6.7 0 0 1-2 5.1l-1.3 1.3 1.2 1.2 1.3-1.3A8.7 8.7 0 0 0 23 12.9a8.7 8.7 0 0 0-2.5-6.2L19.2 5.4l-1.5 1.7z"/></svg>
-            <svg class="ic ic-vol-low" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5z"/></svg>
-            <svg class="ic ic-vol-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.6.2 1.4 1.4 2-2 1.2 1.2-2 2 2 2-1.2 1.2-2-2-2 2-1.2-1.2 2-2-2-2 1.8-1.4z"/></svg>
-          </span>
-          <input id="volume" type="range" min="0" max="100" value="80" aria-label="音量" />
-          <span id="volume-val">80%</span>
+      <div class="search-song">
+        <label class="search-field">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input id="manual-query" placeholder="歌名、链接或 BV 号" aria-label="点歌" />
         </label>
-        <div class="row request-row">
-          <input id="manual-query" placeholder="例如：晴天 周杰伦 酷狗" />
-          <button class="primary" id="btn-request">点歌</button>
+        <button type="button" class="btn-cta" id="btn-request">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          点歌
+        </button>
+      </div>
+      <div class="topbar-end">
+        <button type="button" class="btn-settings btn-popout" id="btn-popout">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
+          弹出窗口
+        </button>
+        <div class="status">
+          <span id="pill-danmaku" class="off" title="弹幕：未连接"><i></i>弹幕</span>
+          <span id="pill-login" class="off" title="B站发送：未登录"><i></i>登录</span>
+          <span id="pill-player" class="off" title="播放器：未打开"><i></i>播放器</span>
+          <span id="pill-room" class="on" title="房间：-"><i></i>房间</span>
         </div>
+        <button type="button" class="btn-settings" id="btn-settings" aria-haspopup="dialog" aria-controls="settings-drawer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54A.48.48 0 0 0 14.9 2h-3.8a.48.48 0 0 0-.48.41l-.36 2.54c-.59.22-1.14.54-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L3.73 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.85 14.52a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.31.59.22l2.39-.96c.5.4 1.04.72 1.63.94l.36 2.54c.05.24.25.41.48.41h3.8c.24 0 .44-.17.48-.41l.36-2.54c.59-.22 1.14-.54 1.63-.94l2.39.96c.22.09.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 15.6 12 3.6 3.6 0 0 1 12 15.6z"/></svg>
+          设置
+        </button>
+      </div>
+    </header>
+
+    <div class="shell">
+      <div class="col-player">
+        <section class="stage card">
+          <!-- 封面取色光晕：两层预先柔化的 radial-gradient，只做透明度和平移动画（不用 filter/backdrop-filter）。 -->
+          <div class="cover-glow" id="cover-glow" aria-hidden="true"><span class="glow-layer is-front"></span><span class="glow-layer"></span></div>
+          <div class="stage-more">
+            <button type="button" class="btn-icon more-btn" id="btn-more" title="更多操作" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false" aria-controls="now-more-menu">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10.5A1.5 1.5 0 1 1 6 13.5 1.5 1.5 0 0 1 6 10.5zm6 0A1.5 1.5 0 1 1 12 13.5 1.5 1.5 0 0 1 12 10.5zm6 0A1.5 1.5 0 1 1 18 13.5 1.5 1.5 0 0 1 18 10.5z"/></svg>
+            </button>
+            <div class="more-menu" id="now-more-menu" role="menu" hidden>
+              <button type="button" class="menu-item" id="btn-add-idle" role="menuitem" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                添加到默认歌单
+              </button>
+              <button type="button" class="menu-item danger" id="btn-block-song" role="menuitem" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.3 13.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9 2.9 2.9z"/></svg>
+                拉黑这首歌
+              </button>
+              <button type="button" class="menu-item danger" id="btn-clear" role="menuitem">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z"/></svg>
+                清空队列
+              </button>
+            </div>
+          </div>
+          <div class="cover-stage vinyl">
+            <div class="vinyl-disc">
+              <div class="cover" id="cover"></div>
+            </div>
+          </div>
+          <div class="now-info">
+            <div class="now-head">
+              <div class="kicker" id="now-kicker">准备就绪</div>
+              <div class="live-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="title-wrap"><div class="title-track" id="now-title-track" data-title-id="now-title"><span class="title" id="now-title">暂无歌曲</span></div></div>
+            <p class="artist" id="now-artist"></p>
+            <p class="meta" id="now-meta">打开本页即可出声。把覆盖层加到 OBS 给观众看选歌和封面。</p>
+            <div class="lyric" id="now-lyric" hidden></div>
+          </div>
+          <div class="progress">
+            <time id="now-pos">00:00</time>
+            <div class="bar" id="now-progress" title="点击可跳到指定位置"><span id="now-bar"></span></div>
+            <time id="now-time">00:00</time>
+          </div>
+          <div class="row-actions">
+            <div class="transport">
+              <button class="btn-icon tactile" id="btn-prev" type="button" title="上一首" aria-label="上一首">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"/></svg>
+              </button>
+              <button class="btn-icon btn-play tactile" id="btn-play" type="button" disabled title="播放" aria-label="播放">
+                <svg class="ic ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L20 12 8 5.2z"/></svg>
+                <svg class="ic ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.4v14H7V5zm6.6 0H17v14h-3.4V5z"/></svg>
+              </button>
+              <button class="btn-icon tactile" id="btn-skip" type="button" title="下一首" aria-label="下一首">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"/></svg>
+              </button>
+              <button class="btn-icon tactile" id="btn-sound" type="button" hidden title="点击开始出声" aria-label="点击开始出声">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.2-1.1 1.3 1.3c.8.8 1.3 2 1.3 3.3s-.5 2.5-1.3 3.3l-1.3 1.3 1.2 1.2 1.3-1.3A6.7 6.7 0 0 0 20 12.9a6.7 6.7 0 0 0-2.3-5.1L16.4 6.5l-1.2 1.9z"/></svg>
+              </button>
+            </div>
+            <label class="volume-ctl vol">
+              <span class="vol-ic vol-high" id="vol-icon" aria-hidden="true">
+                <svg class="ic ic-vol-high" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5zm2.6-2.6 1.3 1.3A6.7 6.7 0 0 1 21 12.9a6.7 6.7 0 0 1-2 5.1l-1.3 1.3 1.2 1.2 1.3-1.3A8.7 8.7 0 0 0 23 12.9a8.7 8.7 0 0 0-2.5-6.2L19.2 5.4l-1.5 1.7z"/></svg>
+                <svg class="ic ic-vol-low" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.1.2 1.3 1.3c.5.5.8 1.2.8 1.9s-.3 1.4-.8 1.9l-1.3 1.3 1.2 1.2 1.3-1.3A4.7 4.7 0 0 0 19 12.9a4.7 4.7 0 0 0-1.4-3.4l-1.3-1.3-1.2 1.5z"/></svg>
+                <svg class="ic ic-vol-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.2L12 5.8v12.4L7.2 14.5H4V9.5zm11.6.2 1.4 1.4 2-2 1.2 1.2-2 2 2 2-1.2 1.2-2-2-2 2-1.2-1.2 2-2-2-2 1.8-1.4z"/></svg>
+              </span>
+              <input id="volume" type="range" min="0" max="100" value="80" aria-label="音量" />
+              <span id="volume-val">80%</span>
+            </label>
+          </div>
+          <p class="next next-line" id="now-next" hidden></p>
+        </section>
+        <section class="card logs-card slim">
+          <div class="logs-head">日志</div>
+          <div class="logs" id="logs"><div class="empty-row empty-state empty-logs"><span class="empty-mark mark-logs" aria-hidden="true"><i></i><i></i><i></i></span><p class="empty-text">还没有记录，点歌和播放会出现在这里。</p></div></div>
+        </section>
+      </div>
+
+      <section class="card lists-card">
+        <div class="list-head">
+          <div class="lists-tabs glass-tabs compact-tabs" id="lists-tabs" role="tablist">
+            <span class="glass-tabs-ink" id="list-tab-ink" aria-hidden="true"></span>
+            <button type="button" class="list-tab is-active" data-list="queue" role="tab" aria-selected="true">播放列表</button>
+            <button type="button" class="list-tab" data-list="idle" role="tab" aria-selected="false">默认歌单</button>
+          </div>
+          <span class="list-count" id="list-count">0 首</span>
+        </div>
+        <div class="lists-body">
+          <div class="list-pane is-active" data-list="queue">
+            <ul class="queue song-list" id="queue"><li class="muted empty-row empty-state"><span class="empty-mark mark-folder" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span><p class="empty-title">等待第一首点歌</p><p class="empty-text">还没有歌曲，观众发送「点歌 歌名」后会显示在这里。</p><span class="tag-stack" aria-label="弹幕示例"><span class="cmd-chip">点歌 晴天</span><span class="cmd-chip">点歌 夜曲</span><span class="cmd-chip">点歌 BV 号</span></span></li></ul>
+          </div>
+          <div class="list-pane" data-list="idle">
+            <ul class="idle-list song-list" id="idle-list"></ul>
+            <div class="row idle-add-row">
+              <input id="idle-input" placeholder="歌名或哔哩哔哩视频链接 / BV 号" />
+              <button type="button" id="btn-idle-add" class="btn-cta">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                <span class="btn-label">添加</span>
+              </button>
+            </div>
+          </div>
+          <div id="selection" class="selection-overlay"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" id="settings-backdrop" hidden></div>
+  <aside class="settings-drawer settings-card" id="settings-drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true">
+    <div class="drawer-head">
+      <h2 id="settings-title">设置</h2>
+      <button type="button" class="btn-icon tactile" id="btn-settings-close" title="关闭设置" aria-label="关闭设置">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.7 13 11l5.3 5.3-1.4 1.4L11.6 12.4 6.3 17.7 4.9 16.3 10.2 11 4.9 5.7 6.3 4.3l5.3 5.3 5.3-5.3z"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+    <!-- LeiBox glass-tab-menu inspired sliding tabs. Design reference: solutionb / LeiBox, for learning. -->
+    <div class="theme-picker" id="theme-picker">
+      <span class="field-label">控制台主题</span>
+      <div class="theme-swatches" role="radiogroup" aria-label="控制台主题">
+        <button type="button" class="theme-swatch is-active" data-theme="plain" title="素白">
+          <span class="theme-chip" aria-hidden="true"></span>
+          <span>素白</span>
+        </button>
+        <button type="button" class="theme-swatch" data-theme="wine" title="酒夜">
+          <span class="theme-chip" aria-hidden="true"></span>
+          <span>酒夜</span>
+        </button>
+        <button type="button" class="theme-swatch" data-theme="blush" title="粉白">
+          <span class="theme-chip" aria-hidden="true"></span>
+          <span>粉白</span>
+        </button>
+        <button type="button" class="theme-swatch" data-theme="inkgold" title="墨金">
+          <span class="theme-chip" aria-hidden="true"></span>
+          <span>墨金</span>
+        </button>
+        <button type="button" class="theme-swatch" data-theme="celadon" title="青瓷">
+          <span class="theme-chip" aria-hidden="true"></span>
+          <span>青瓷</span>
+        </button>
       </div>
     </div>
-    <audio id="console-audio" preload="auto"></audio>
-  </section>
-
-  <main class="layout">
-    <section class="card lists-card">
-      <div class="lists-tabs glass-tabs compact-tabs" id="lists-tabs" role="tablist">
-        <span class="glass-tabs-ink" id="list-tab-ink" aria-hidden="true"></span>
-        <button type="button" class="list-tab is-active" data-list="queue" role="tab" aria-selected="true">播放列表</button>
-        <button type="button" class="list-tab" data-list="idle" role="tab" aria-selected="false">默认歌单</button>
-      </div>
-      <div class="list-pane is-active" data-list="queue">
-        <ul class="queue" id="queue"></ul>
-      </div>
-      <div class="list-pane" data-list="idle">
-        <ul class="idle-list" id="idle-list"></ul>
-        <div class="row idle-add-row">
-          <input id="idle-input" placeholder="歌名或哔哩哔哩视频链接 / BV 号" />
-          <button id="btn-idle-add">添加</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="card sel-card">
-      <h2>选歌 / 日志</h2>
-      <div id="selection"></div>
-      <div class="logs" id="logs"></div>
-    </section>
-  </main>
-
-  <section class="card settings-card">
-    <h2>设置</h2>
-    <!-- LeiBox glass-tab-menu inspired sliding tabs. Design reference: solutionb / LeiBox, for learning. -->
     <div class="glass-tabs" id="settings-tabs" role="tablist">
       <span class="glass-tabs-ink" id="tab-ink" aria-hidden="true"></span>
       <button type="button" class="tab-btn is-active" data-tab="overlay" role="tab" aria-selected="true">播放器样式</button>
@@ -356,9 +394,12 @@
       </div>
       <p class="hint">OBS 覆盖层：<code>http://127.0.0.1:8765/overlay</code>　播放器：<code>http://127.0.0.1:8765/player</code></p>
     </div>
-  </section>
 
-  <script src="/static/js/common.js?v=31"></script>
-  <script src="/static/js/console.js?v=31"></script>
+    </div>
+  </aside>
+
+  <audio id="console-audio" preload="auto"></audio>
+  <script src="/static/js/common.js?v=35"></script>
+  <script src="/static/js/console.js?v=35"></script>
 </body>
 </html>

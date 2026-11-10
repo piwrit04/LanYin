@@ -8,15 +8,20 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.portcfg import base_url, http_get, window_url  # noqa: E402  (stdlib only)
+
 DATA = ROOT / "data"
 PROFILE = DATA / "console-window-profile"
-URL = "http://127.0.0.1:8765/window?v=31"
+# 端口跟 config.yaml 走（默认 8765），版本号跟 console.html 的 ?v=35 一致
+URL = window_url()
 TITLE = "澜音控制台"
 WIDTH, HEIGHT = 1320, 900
-HEALTH = "http://127.0.0.1:8765/api/health"
+HEALTH = base_url() + "/api/health"
 
 CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 CREATE_NO_WINDOW = 0x08000000
@@ -36,7 +41,7 @@ def wait_server(timeout: float = 30) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urlopen(HEALTH, timeout=1) as resp:
+            with http_get(HEALTH, timeout=1) as resp:
                 if getattr(resp, "status", 200) == 200:
                     return True
         except Exception:

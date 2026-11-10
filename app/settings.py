@@ -286,9 +286,16 @@ def _normalize_theme(cfg: dict[str, Any]) -> str:
 
 def load_config() -> dict[str, Any]:
     data: dict[str, Any] = {}
-    if CONFIG_PATH.exists():
-        with CONFIG_PATH.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+    first_run = not CONFIG_PATH.exists()
+    if not first_run:
+        raw = CONFIG_PATH.read_bytes()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            # 旧版记事本按 ANSI（GBK）另存的中文配置
+            text = raw.decode("gbk", errors="replace")
+        loaded = yaml.safe_load(text) or {}
+        data = loaded if isinstance(loaded, dict) else {}
     cfg = _deep_merge(DEFAULTS, data)
     pri = [s for s in cfg.get("sources_priority") or [] if s in VALID_SOURCES]
     for s in VALID_SOURCES:
@@ -310,6 +317,12 @@ def load_config() -> dict[str, Any]:
     cfg["console_theme"] = _normalize_theme(cfg)
     cfg["priority_queue"] = normalize_priority_queue(cfg)
     cfg["blacklist"] = normalize_blacklist(cfg)
+    if first_run and not CONFIG_PATH.exists():
+        # 第一次运行：写一份默认 config.yaml（只在文件不存在时写，绝不覆盖已有配置）
+        try:
+            save_config(cfg)
+        except Exception:
+            pass
     return cfg
 
 

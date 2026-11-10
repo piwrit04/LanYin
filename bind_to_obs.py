@@ -9,9 +9,12 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from app.portcfg import base_url  # noqa: E402  (stdlib only, 系统 Python 也能跑)
+
 DOCK = {
     "title": "澜音控制台",
-    "url": "http://127.0.0.1:8765/",
+    "url": base_url() + "/",  # 端口跟 config.yaml 走，默认 8765
     "uuid": "obssongrequestconsole01",
 }
 SCRIPT_NAME = "lanyin.lua"

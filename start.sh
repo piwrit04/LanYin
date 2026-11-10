@@ -36,12 +36,13 @@ echo "正在检查依赖…"
 python -m pip install -q --upgrade pip
 python -m pip install -q -r requirements.txt
 
+BASE="$(python -c 'from app.portcfg import base_url; print(base_url())')"
 echo
 echo "=============================================="
 echo "  澜音已启动"
-echo "  控制台：http://127.0.0.1:8765/"
-echo "  覆盖层：http://127.0.0.1:8765/overlay"
-echo "  播放器：http://127.0.0.1:8765/player"
+echo "  控制台：${BASE}/"
+echo "  覆盖层：${BASE}/overlay"
+echo "  播放器：${BASE}/player"
 echo "  按 Ctrl+C 可以停止"
 echo "=============================================="
 echo

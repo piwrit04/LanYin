@@ -11,9 +11,24 @@ def load_secrets() -> dict[str, Any]:
     if not SECRETS_PATH.exists():
         return {}
     try:
-        return json.loads(SECRETS_PATH.read_text(encoding="utf-8")) or {}
-    except json.JSONDecodeError:
+        # utf-8-sig：用记事本另存过的文件可能带 BOM，普通 utf-8 读会解析失败
+        data = json.loads(SECRETS_PATH.read_text(encoding="utf-8-sig")) or {}
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # 读不懂时先留一份备份，避免下一次保存把原文件直接覆盖掉
+        _backup_unreadable()
         return {}
+
+
+def _backup_unreadable() -> None:
+    import time
+
+    try:
+        bak = SECRETS_PATH.with_name(f"secrets.unreadable-{time.strftime('%Y%m%d-%H%M%S')}.json")
+        if not any(SECRETS_PATH.parent.glob("secrets.unreadable-*.json")):
+            bak.write_bytes(SECRETS_PATH.read_bytes())
+    except OSError:
+        pass
 
 
 def save_secrets(data: dict[str, Any]) -> None:

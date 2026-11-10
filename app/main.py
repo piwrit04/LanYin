@@ -58,7 +58,7 @@ class AppState:
                 "idle_playlist": dict(self.config.get("idle_playlist") or {"enabled": False, "loop": True, "resume_delay_seconds": 5, "items": []}),
                 "overlay": dict(self.config.get("overlay") or {}),
                 "messages": dict(self.config.get("messages") or {}),
-                "console_theme": self.config.get("console_theme") or "wine",
+                "console_theme": self.config.get("console_theme") or "plain",
                 "priority_queue": dict(self.config.get("priority_queue") or {"enabled": True}),
                 "blacklist": dict(self.config.get("blacklist") or {"users": [], "songs": []}),
             },
@@ -109,6 +109,15 @@ def _write_pid() -> None:
 
 
 def _clear_pid() -> None:
+    # 只清理自己写的标记。否则第二个实例绑端口失败退出时，会把正在运行的那个实例的
+    # server.pid / server.ready 删掉，OBS 脚本就以为澜音没在跑、也停不掉它。
+    import os
+    try:
+        owner = (DATA_DIR / "server.pid").read_text(encoding="utf-8").strip()
+    except Exception:
+        owner = ""
+    if owner and owner != str(os.getpid()):
+        return
     for name in ("server.pid", "server.ready", "launch.pid"):
         try:
             path = DATA_DIR / name
@@ -176,7 +185,7 @@ async def api_state():
 
 @app.get("/api/health")
 async def api_health():
-    return {"ok": True, "version": __version__, "room_id": state.config["room_id"]}
+    return {"ok": True, "app": "lanyin", "version": __version__, "room_id": state.config["room_id"]}
 
 
 @app.websocket("/ws")
@@ -750,10 +759,25 @@ def run() -> None:
             sys.stderr = log_f
 
     cfg = load_config()
+    from app.portcfg import probe
+
+    port = int(cfg.get("port") or 8765)
+    status = probe(port, str(cfg.get("host") or "127.0.0.1"))
+    if status == "lanyin":
+        # 本地版和 OBS 脚本版同时启动时，后来的那个直接复用已在运行的澜音
+        print(f"澜音已经在运行（端口 {port}），不再重复启动。", flush=True)
+        raise SystemExit(0)
+    if status == "other":
+        print(
+            f"端口 {port} 已被其他程序占用，澜音无法启动。"
+            f"请用记事本打开 config.yaml，把 port: {port} 改成别的数字（例如 18765）后再启动。",
+            flush=True,
+        )
+        raise SystemExit(2)
     uvicorn.run(
         "app.main:app",
         host=str(cfg.get("host") or "127.0.0.1"),
-        port=int(cfg.get("port") or 8765),
+        port=port,
         reload=False,
         log_level="info",
     )

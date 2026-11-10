@@ -11,7 +11,7 @@ let qrTimer = null;
 
 const audio = document.getElementById("console-audio");
 const VOLUME_KEY = "obs-song-volume";
-const THEME_IDS = { wine: "酒夜", blush: "粉白", inkgold: "墨金", celadon: "青瓷" };
+const THEME_IDS = { plain: "素白", wine: "酒夜", blush: "粉白", inkgold: "墨金", celadon: "青瓷" };
 const TIER_LABELS = { 0: "总督", 1: "提督", 2: "舰长", 3: "粉丝牌" };
 let audioBlocked = false;
 let currentAudioId = "";
@@ -20,7 +20,8 @@ let lyricLines = [];
 let overlaySaveTimer = null;
 
 function loadVolume() {
-  const v = Number(localStorage.getItem(VOLUME_KEY));
+  const raw = localStorage.getItem(VOLUME_KEY);
+  const v = raw === null || raw === "" ? NaN : Number(raw);
   return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.8;
 }
 
@@ -130,8 +131,10 @@ function connect() {
       render();
     } else if (msg.type === "log") {
       if (!state.logs) state.logs = [];
-      state.logs.push(msg.payload);
-      renderLogs();
+      if (!hasLogEntry(state.logs, msg.payload)) {
+        state.logs.push(msg.payload);
+        renderLogs();
+      }
     } else if (msg.type === "progress") {
       if (state.current) {
         state.current.position = msg.payload.position;
@@ -149,6 +152,21 @@ function connect() {
   ws.onclose = () => setTimeout(connect, 1500);
 }
 
+// 服务器先把日志写进快照、再单独广播 log；两条消息先后不定，按 id（旧服务器无 id 时按 ts+内容）去重。
+function hasLogEntry(logs, entry) {
+  if (!entry) return true;
+  for (let i = logs.length - 1, n = 0; i >= 0 && n < 120; i--, n++) {
+    const l = logs[i];
+    if (entry.id != null && l.id != null) {
+      if (l.id === entry.id) return true;
+      if (l.id < entry.id) return false;
+    } else if (l.ts === entry.ts && l.message === entry.message && l.level === entry.level) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function send(payload) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(payload));
 }
@@ -162,8 +180,11 @@ function fmt(sec) {
 
 function setPill(id, on, text) {
   const el = document.getElementById(id);
-  el.textContent = text;
-  el.className = "pill " + (on ? "on" : "off");
+  if (!el) return;
+  el.classList.toggle("on", !!on);
+  el.classList.toggle("off", !on);
+  el.title = text;
+  el.setAttribute("aria-label", text);
 }
 
 function isIdleTrack(item) {
@@ -210,10 +231,13 @@ function showLyricsEnabled() {
   return ov.show_lyrics !== false;
 }
 
-function renderNextOn(el, nxt) {
+function renderNextOn(el, nxt, style) {
   if (!el) return;
   if (nxt && (nxt.title || nxt.artist)) {
-    el.textContent = "下一首：" + [nxt.title || "", nxt.artist || ""].filter(Boolean).join(" - ");
+    const parts = [nxt.title || "", nxt.artist || ""].filter(Boolean);
+    el.textContent = style === "dot"
+      ? "下一首 · " + parts.join(" — ")
+      : "下一首：" + parts.join(" - ");
     el.hidden = false;
   } else {
     el.textContent = "";
@@ -251,11 +275,12 @@ function renderNow() {
     setCover(cover, "");
     cover.classList.remove("is-playing");
     setVinylSpin(cover, false, true);
+    setGlow("", "idle");
     bar.style.width = "0%";
     posEl.textContent = "00:00";
     time.textContent = "00:00";
     if (lyricEl) { lyricEl.textContent = ""; lyricEl.hidden = true; }
-    renderNextOn(document.getElementById("now-next"), state.next);
+    renderNextOn(document.getElementById("now-next"), state.next, "dot");
     setPlayButton(true, true);
     setNowActions(false);
     return;
@@ -270,6 +295,7 @@ function renderNow() {
   setCover(cover, cur.cover_url);
   cover.classList.toggle("is-playing", !cur.paused);
   setVinylSpin(cover, !cur.paused);
+  setGlow(cur.cover_url || "", cur.paused ? "paused" : "playing");
   const dur = cur.duration || 0;
   const pos = cur.position || 0;
   bar.style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : "0%";
@@ -280,10 +306,102 @@ function renderNow() {
     lyricEl.textContent = showLyric ? line : "";
     lyricEl.hidden = !showLyric || !line;
   }
-  renderNextOn(document.getElementById("now-next"), state.next);
+  renderNextOn(document.getElementById("now-next"), state.next, "dot");
   setPlayButton(!!cur.paused, false);
   setNowActions(true);
 }
+
+const IC_NOTE = "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z";
+
+// 安静的空状态：小图标 + 一行标题 + 一行说明（可选弹幕示例，LeiBox「标签叠放」思路的静态版）。
+function emptyState(opts) {
+  const tag = opts.tag || "li";
+  const mark = opts.kind === "logs"
+    ? '<span class="empty-mark mark-logs" aria-hidden="true"><i></i><i></i><i></i></span>'
+    : `<span class="empty-mark mark-folder" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${IC_NOTE}"/></svg></span>`;
+  const title = opts.title ? `<p class="empty-title">${esc(opts.title)}</p>` : "";
+  const chips = (opts.chips || []).length
+    ? `<span class="tag-stack" aria-label="弹幕示例">${opts.chips.map((c) => `<span class="cmd-chip">${esc(c)}</span>`).join("")}</span>`
+    : "";
+  const cls = ["muted", "empty-row", "empty-state", opts.kind === "logs" ? "empty-logs" : ""].filter(Boolean).join(" ");
+  return `<${tag} class="${cls}">${mark}${title}<p class="empty-text">${esc(opts.text)}</p>${chips}</${tag}>`;
+}
+
+// ---- 封面取色光晕 ----
+// 从封面（同源 /api/cover 代理）缩到 16×16 取主色；取不到（无封面/CORS/解码失败）用主题自带的中性色。
+const glowColorCache = new Map();
+let glowKey = null;
+
+function sampleCoverColor(img) {
+  const c = document.createElement("canvas");
+  c.width = 16; c.height = 16;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, 16, 16);
+  const d = ctx.getImageData(0, 0, 16, 16).data;
+  let r = 0, g = 0, b = 0, w = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 128) continue;
+    const R = d[i], G = d[i + 1], B = d[i + 2];
+    const max = Math.max(R, G, B), min = Math.min(R, G, B);
+    const light = (max + min) / 2;
+    if (light < 18 || light > 242) continue;
+    const sat = max === 0 ? 0 : (max - min) / max;
+    const wt = 0.15 + sat * sat * 2;
+    r += R * wt; g += G * wt; b += B * wt; w += wt;
+  }
+  if (!w) return null;
+  return [Math.round(r / w), Math.round(g / w), Math.round(b / w)];
+}
+
+function applyGlowColor(rgb) {
+  const glow = document.getElementById("cover-glow");
+  if (!glow) return;
+  const layers = glow.querySelectorAll(".glow-layer");
+  if (layers.length < 2) return;
+  const front = glow.querySelector(".glow-layer.is-front") || layers[0];
+  const back = front === layers[0] ? layers[1] : layers[0];
+  if (rgb) back.style.setProperty("--glow-rgb", rgb.join(" "));
+  else back.style.removeProperty("--glow-rgb");
+  back.classList.add("is-front");
+  front.classList.remove("is-front");
+  glow.classList.toggle("has-color", !!rgb);
+}
+
+function setGlow(url, mode) {
+  const glow = document.getElementById("cover-glow");
+  if (!glow) return;
+  const stage = glow.closest(".stage");
+  if (stage) {
+    stage.classList.toggle("is-playing", mode === "playing");
+    stage.classList.toggle("is-paused", mode === "paused");
+  }
+  const key = url || "";
+  if (key === glowKey) return;
+  glowKey = key;
+  if (!key) { applyGlowColor(null); return; }
+  if (glowColorCache.has(key)) { applyGlowColor(glowColorCache.get(key)); return; }
+  const img = new Image();
+  img.decoding = "async";
+  img.onload = () => {
+    let rgb = null;
+    try { rgb = sampleCoverColor(img); } catch (e) { rgb = null; }
+    glowColorCache.set(key, rgb);
+    if (glowKey === key) applyGlowColor(rgb);
+  };
+  img.onerror = () => {
+    glowColorCache.set(key, null);
+    if (glowKey === key) applyGlowColor(null);
+  };
+  img.src = coverSrc(key);
+}
+
+function iconBtn(cls, attrs, label, path) {
+  return `<button type="button" class="row-btn ${cls}" ${attrs} title="${label}" aria-label="${label}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg></button>`;
+}
+
+const IC_UP = "M12 5 6 11h4v8h4v-8h4z";
+const IC_DOWN = "M12 19 18 13h-4V5h-4v8H6z";
+const IC_DEL = "M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z";
 
 function trackRow(item, opts) {
   const current = !!opts.current;
@@ -297,43 +415,47 @@ function trackRow(item, opts) {
   const seasonIndex = extra.season_index || item.season_index || 0;
   const seasonTitle = extra.season_title || item.season_title || "";
   const tags = [];
-  if (current) tags.push('<span class="tag">正在播放</span>');
   if (idle && seasonTotal > 1) {
     tags.push('<span class="tag tag-idle">合集' + (seasonIndex ? ` 第${seasonIndex}/${seasonTotal}` : "") + "</span>");
   } else if (idle) {
     tags.push('<span class="tag tag-idle">默认歌单</span>');
-  } else if (!current) {
+  } else {
     tags.push('<span class="tag tag-request">点歌</span>');
   }
-  if (pri && !idle) tags.push('<span class="tag">' + pri + '</span>');
+  if (pri && !idle) tags.push('<span class="tag tag-priority">' + pri + "</span>");
   const tag = tags.join("");
+  const source = SOURCE_LABEL[item.source] || item.source || "";
   let who = "";
   if (idle) {
     who = seasonTitle && seasonTotal > 1 ? seasonTitle : "默认歌单";
-  } else {
-    who = item.requester_name ? "点歌人 " + item.requester_name : "点歌";
+  } else if (item.requester_name) {
+    who = "点歌人 " + item.requester_name;
   }
+  const subParts = [item.artist || "", source, who].filter(Boolean);
   const actions = [];
   if (canMove) {
     const atStart = !!opts.atStart;
     const atEnd = !!opts.atEnd;
-    actions.push(`<button type="button" class="ghost q-move" data-move="up" data-id="${esc(item.id)}" title="上移插队" aria-label="上移插队"${atStart ? " disabled" : ""}>上移</button>`);
-    actions.push(`<button type="button" class="ghost q-move" data-move="down" data-id="${esc(item.id)}" title="下移" aria-label="下移"${atEnd ? " disabled" : ""}>下移</button>`);
+    actions.push(iconBtn("q-move", `data-move="up" data-id="${esc(item.id)}"${atStart ? " disabled" : ""}`, "上移插队", IC_UP));
+    actions.push(iconBtn("q-move", `data-move="down" data-id="${esc(item.id)}"${atEnd ? " disabled" : ""}`, "下移", IC_DOWN));
   }
-  if (canDelete) actions.push(`<button type="button" class="ghost danger" data-del="${esc(item.id)}">删除</button>`);
-  const tools = actions.length ? `<div class="q-actions">${actions.join("")}</div>` : "<span></span>";
-  const handle = current
-    ? `<span class="q-handle is-disabled" aria-hidden="true"></span>`
-    : `<span class="q-handle" title="拖动插队" aria-label="拖动插队">⋮⋮</span>`;
+  if (canDelete) actions.push(iconBtn("danger", `data-del="${esc(item.id)}"`, "移除", IC_DEL));
+  const tools = actions.length ? `<div class="q-actions">${actions.join("")}</div>` : "<span class=\"q-actions\"></span>";
+  const idx = current
+    ? `<span class="q-idx"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>`
+    : `<span class="q-idx">${opts.index || ""}</span>`;
   const cls = [current ? "current" : "", canMove ? "is-movable" : ""].filter(Boolean).join(" ");
+  const dur = item.duration ? fmt(item.duration) : "";
   return `
     <li class="${cls}" ${canMove ? `draggable="true" data-id="${esc(item.id)}"` : ""}>
-      ${handle}
+      ${idx}
       <div class="q-cover"${img}></div>
-      <div>
-        <div class="q-title">${esc(item.title)}${tag}</div>
-        <div class="q-sub">${esc(item.artist || "")} · ${esc(SOURCE_LABEL[item.source] || item.source || "")}${who ? " · " + esc(who) : ""}</div>
+      <div class="q-meta">
+        <div class="q-title">${esc(item.title)}</div>
+        <div class="q-sub">${esc(subParts.join(" · "))}</div>
       </div>
+      <span class="q-tags">${tag}</span>
+      <time class="q-time">${dur}</time>
       ${tools}
     </li>`;
 }
@@ -350,18 +472,23 @@ function renderQueue() {
   const ul = document.getElementById("queue");
   const queue = state.queue || [];
   const cur = state.current;
+  updateListCount();
   if (!cur && !queue.length) {
     const idleOn = !!idleSettings().enabled;
-    const msg = idleOn
-      ? "点歌队列是空的。没人点歌时会播放「默认歌单」里的曲子。"
-      : "队列是空的。观众发送「点歌 歌名」即可。";
-    ul.innerHTML = `<li class="muted empty-row">${msg}</li>`;
+    ul.innerHTML = idleOn
+      ? emptyState({ title: "默认歌单会接着播", text: "还没有歌曲。没人点歌时会播放「默认歌单」里的曲子。" })
+      : emptyState({
+        title: "等待第一首点歌",
+        text: "还没有歌曲，观众发送「点歌 歌名」后会显示在这里。",
+        chips: ["点歌 晴天", "点歌 夜曲", "点歌 BV 号"],
+      });
     return;
   }
   const parts = [];
-  if (cur) parts.push(trackRow(cur, { current: true, canDelete: false, canMove: false }));
+  if (cur) parts.push(trackRow(cur, { current: true, canDelete: false, canMove: false, index: 1 }));
   queue.forEach((item, i) => parts.push(trackRow(item, {
     current: false, canDelete: true, canMove: true, atStart: i === 0, atEnd: i === queue.length - 1,
+    index: (cur ? 2 : 1) + i,
   })));
   ul.innerHTML = parts.join("");
   ul.querySelectorAll("[data-del]").forEach((btn) => {
@@ -408,28 +535,34 @@ function renderIdle() {
   }
   const ul = document.getElementById("idle-list");
   const items = cfg.items || [];
+  updateListCount();
   if (!items.length) {
-    ul.innerHTML = '<li class="muted empty-row">还没有曲子。添加歌名或哔哩哔哩视频后，没人点歌时就会播放。</li>';
+    ul.innerHTML = emptyState({ title: "默认歌单还是空的", text: "还没有曲子。添加歌名或哔哩哔哩视频后，没人点歌时就会播放。" });
     return;
   }
-  ul.innerHTML = items.map((item) => {
+  ul.innerHTML = items.map((item, i) => {
     const img = item.cover_url ? ` style="background-image:url('${coverSrc(item.cover_url)}')"` : "";
     const title = item.title || item.query || item.bvid || "未命名";
-    let sub = item.kind === "bili"
-      ? `${item.artist || "哔哩哔哩"} · 哔哩哔哩视频`
-      : (item.query || "按歌名搜索");
+    const source = item.kind === "bili"
+      ? "哔哩哔哩"
+      : (SOURCE_LABEL[item.source] || item.source || (item.query ? "按歌名搜索" : ""));
+    let who = "默认歌单";
     if (item.kind === "bili" && Number(item.season_total) > 1) {
-      const st = item.season_title || "合集";
-      sub = `${item.artist || "哔哩哔哩"} · ${st} 第 ${item.season_index || 1}/${item.season_total}，播完自动接下集`;
+      who = `${item.season_title || "合集"} 第 ${item.season_index || 1}/${item.season_total}`;
     }
+    const sub = [item.artist || "", source, who].filter(Boolean).join(" · ");
+    const dur = item.duration ? fmt(item.duration) : "";
     return `
       <li draggable="true" data-id="${esc(item.id)}">
+        <span class="q-idx">${i + 1}</span>
         <div class="q-cover"${img}></div>
-        <div>
+        <div class="q-meta">
           <div class="q-title">${esc(title)}</div>
           <div class="q-sub">${esc(sub)}</div>
         </div>
-        <button class="ghost danger" data-idle-del="${esc(item.id)}">移除</button>
+        <span class="q-tags"><span class="tag tag-idle">默认歌单</span></span>
+        <time class="q-time">${dur}</time>
+        <div class="q-actions">${iconBtn("danger", `data-idle-del="${esc(item.id)}"`, "移除", IC_DEL)}</div>
       </li>`;
   }).join("");
   ul.querySelectorAll("[data-idle-del]").forEach((btn) => {
@@ -462,6 +595,16 @@ function renderIdle() {
   });
 }
 
+// LeiBox「点阵加载」（ai-generating）思路的轻量版：3×3 点只做透明度呼吸。
+// 选歌框每 500ms 重绘一次，用负 delay 让动画相位连续，不会每次从头跳。
+// Design reference: LeiBox ai-generating / 点阵加载, adapted to CSS only.
+function dotMatrix() {
+  const phase = -(Date.now() % 1600);
+  let dots = "";
+  for (let i = 0; i < 9; i++) dots += `<i style="animation-delay:${phase + ((i % 3) + Math.floor(i / 3)) * 160}ms"></i>`;
+  return `<span class="dot-matrix" aria-hidden="true">${dots}</span>`;
+}
+
 function renderSelection() {
   const box = document.getElementById("selection");
   const sel = state.selection;
@@ -472,7 +615,7 @@ function renderSelection() {
   const remain = Math.max(0, Math.floor((sel.deadline * 1000 - Date.now()) / 1000));
   box.innerHTML = `
     <div class="choice-box">
-      <strong>${esc(sel.requester_name)}</strong> 点了「${esc(sel.query)}」，请回复序号（剩余 ${remain} 秒）
+      <div class="choice-head">${dotMatrix()}<span><strong>${esc(sel.requester_name)}</strong> 点了「${esc(sel.query)}」，请回复序号（剩余 ${remain} 秒）</span></div>
       <ol>${(sel.options || []).map((o) => {
         const img = o.cover_url ? ` style="background-image:url('${coverSrc(o.cover_url)}')"` : "";
         return `<li>
@@ -742,10 +885,11 @@ function activateListTab(name) {
   document.querySelectorAll(".lists-card .list-pane").forEach((pane) => {
     pane.classList.toggle("is-active", pane.dataset.list === name);
   });
+  updateListCount();
 }
 
 function applyTheme(name, persist) {
-  const id = THEME_IDS[name] ? name : "wine";
+  const id = THEME_IDS[name] ? name : "plain";
   document.documentElement.dataset.theme = id;
   document.body.dataset.theme = id;
   document.querySelectorAll(".theme-swatch").forEach((btn) => {
@@ -805,19 +949,75 @@ function renderBlacklist() {
   }
 }
 
+function logSpan(cls, text) {
+  return `<span class="${cls}">${esc(text)}</span>`;
+}
+
+function formatLogMessage(raw) {
+  const s = String(raw ?? "");
+  const rules = [
+    [/^(.+?)( 点歌：)(.+)$/, (m) => logSpan("log-user", m[1]) + esc(m[2]) + logSpan("log-song", m[3])],
+    [/^(已为 )(.+?)( 加入：)(.+?)( - )(.+?)(（.+）)?$/, (m) => esc(m[1]) + logSpan("log-user", m[2]) + esc(m[3]) + logSpan("log-song", m[4]) + esc(m[5]) + logSpan("log-artist", m[6]) + esc(m[7] || "")],
+    [/^(开始播放默认歌单：|继续播放默认歌单：|开始播放：|上一首：|重新播放：)(.+?)( - )(.+)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[3]) + logSpan("log-artist", m[4])],
+    [/^(.+?)( 选择了 \d+：)(.+?)( - )(.+)$/, (m) => logSpan("log-user", m[1]) + esc(m[2]) + logSpan("log-song", m[3]) + esc(m[4]) + logSpan("log-artist", m[5])],
+    [/^(.+?)( 选歌已超时，已自动播放第一个结果：)(.+?)( - )(.+)$/, (m) => logSpan("log-user", m[1]) + esc(m[2]) + logSpan("log-song", m[3]) + esc(m[4]) + logSpan("log-artist", m[5])],
+    [/^(「)(.+?)(」有多个候选，等待 )(.+?)( 在 .+)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[3]) + logSpan("log-user", m[4]) + esc(m[5])],
+    [/^(没有找到可完整播放的「)(.+?)(」)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[3])],
+    [/^(「)(.+?)(」在黑名单中，已拒绝 )(.+?)( 的点歌)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[3]) + logSpan("log-user", m[4]) + esc(m[5])],
+    [/^(.+?)( 选歌已超时.*| 撤回.*| 已撤回.*| 没有可撤回.*| 想撤回.*| 正在处理.*| 回复了.*)$/, (m) => logSpan("log-user", m[1]) + esc(m[2])],
+    [/^(检测到 )(.+?)( 进入直播间.*)$/, (m) => esc(m[1]) + logSpan("log-user", m[2]) + esc(m[3])],
+    [/^(收到点歌，已暂停默认歌单：)(.+?)(（\d{1,2}:\d{2}）)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[3])],
+    [/^(已跳过：|已停止播放：|默认歌单已更换，停止播放旧曲子：)(.+)$/, (m) => esc(m[1]) + logSpan("log-song", m[2])],
+    [/^(无法播放「|默认歌单「|暂停的默认歌单「|合集「)(.+?)(」.*)$/, (m) => esc(m[1]) + logSpan("log-song", m[2]) + esc(m[0].slice(m[1].length + m[2].length))],
+    [/^(已拉黑歌曲：|已取消拉黑歌曲：|已加入默认歌单：|已从默认歌单移除：|已加入播放列表 )(.+)$/, (m) => esc(m[1]) + logSpan("log-song", m[2])],
+    [/^(已拉黑用户：)(.+)$/, (m) => esc(m[1]) + logSpan("log-user", m[2])],
+  ];
+  for (const [re, fn] of rules) {
+    const m = s.match(re);
+    if (m) return fn(m);
+  }
+  return esc(s).replace(/「([^」]+)」/g, (_, t) => "「" + logSpan("log-song", t) + "」");
+}
+
+function logKind(level, msg) {
+  if (level === "error") return "log-error";
+  if (level === "warn") return "log-warn";
+  if (/点歌：/.test(msg) || /加入：/.test(msg)) return "log-request";
+  if (/开始播放|继续播放|重新播放|上一首：/.test(msg)) return "log-play";
+  if (/欢迎|进入直播间/.test(msg)) return "log-welcome";
+  if (/拉黑|黑名单/.test(msg)) return "log-block";
+  if (/跳过|超时|撤回|取消|清空|停止|无法播放/.test(msg)) return "log-skip";
+  return "log-system";
+}
+
 function renderLogs() {
   const box = document.getElementById("logs");
   const logs = (state.logs || []).slice(-80);
   const sig = logs.length + ":" + (logs.length ? `${logs[logs.length - 1].ts}|${logs[logs.length - 1].message}` : "");
   if (sig === lastLogSig) return;
   lastLogSig = sig;
+  if (!logs.length) {
+    box.innerHTML = emptyState({ tag: "div", kind: "logs", text: "还没有记录，点歌和播放会出现在这里。" });
+    return;
+  }
   box.innerHTML = logs.map((l) => {
     const t = new Date((l.ts || 0) * 1000);
     const hh = t.toLocaleTimeString("zh-CN", { hour12: false });
-    const cls = l.level === "error" ? "err" : l.level === "warn" ? "warn" : "";
-    return `<div class="${cls}">[${hh}] ${esc(l.message)}</div>`;
+    const cls = logKind(l.level, l.message || "");
+    return `<div class="${cls}"><time>${esc(hh)}</time>${formatLogMessage(l.message)}</div>`;
   }).join("");
   box.scrollTop = box.scrollHeight;
+}
+
+function updateListCount() {
+  const el = document.getElementById("list-count");
+  if (!el) return;
+  const active = document.querySelector("#lists-tabs .list-tab.is-active");
+  const tab = (active && active.dataset.list) || "queue";
+  let n = 0;
+  if (tab === "idle") n = (idleSettings().items || []).length;
+  else n = (state.current ? 1 : 0) + (state.queue || []).length;
+  el.textContent = n + " 首";
 }
 
 function esc(s) {
@@ -987,7 +1187,8 @@ async function addIdleItem() {
   if (!text || idleBusy) return;
   idleBusy = true;
   btn.disabled = true;
-  btn.textContent = "添加中…";
+  const idleLabel = btn.querySelector(".btn-label") || btn;
+  idleLabel.textContent = "添加中…";
   try {
     const res = await fetch("/api/idle_playlist/add", {
       method: "POST",
@@ -1005,7 +1206,8 @@ async function addIdleItem() {
   } finally {
     idleBusy = false;
     btn.disabled = false;
-    btn.textContent = "添加";
+    const idleLabelDone = btn.querySelector(".btn-label") || btn;
+    idleLabelDone.textContent = "添加";
   }
 }
 
@@ -1119,4 +1321,70 @@ if (popBtn) {
   };
 }
 
-applyTheme("wine", false);
+
+function setSettingsOpen(open) {
+  const drawer = document.getElementById("settings-drawer");
+  const backdrop = document.getElementById("settings-backdrop");
+  const btn = document.getElementById("btn-settings");
+  if (!drawer) return;
+  document.body.classList.toggle("settings-open", !!open);
+  drawer.classList.toggle("is-open", !!open);
+  drawer.setAttribute("aria-hidden", open ? "false" : "true");
+  if (backdrop) backdrop.hidden = !open;
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    requestAnimationFrame(() => {
+      const active = document.querySelector("#settings-tabs .tab-btn.is-active");
+      if (active) moveTabInk(active, "settings-tabs", "tab-ink");
+      applyOverlayPreview(false);
+    });
+  }
+}
+
+const btnSettings = document.getElementById("btn-settings");
+const btnSettingsClose = document.getElementById("btn-settings-close");
+const settingsBackdrop = document.getElementById("settings-backdrop");
+if (btnSettings) btnSettings.onclick = () => setSettingsOpen(true);
+if (btnSettingsClose) btnSettingsClose.onclick = () => setSettingsOpen(false);
+if (settingsBackdrop) settingsBackdrop.onclick = () => setSettingsOpen(false);
+
+function setMoreMenu(open) {
+  const menu = document.getElementById("now-more-menu");
+  const btn = document.getElementById("btn-more");
+  if (!menu || !btn) return;
+  menu.hidden = !open;
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+const btnMore = document.getElementById("btn-more");
+if (btnMore) {
+  btnMore.onclick = (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById("now-more-menu");
+    setMoreMenu(!!(menu && menu.hidden));
+  };
+}
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("now-more-menu");
+  const wrap = document.querySelector(".stage-more");
+  if (menu && !menu.hidden && wrap && !wrap.contains(e.target)) setMoreMenu(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  setMoreMenu(false);
+  if (document.body.classList.contains("settings-open")) setSettingsOpen(false);
+});
+
+// LeiBox「渐变卡片跟随」思路：只在鼠标所在的列表行里画一圈很淡的柔光，跟随指针横向位置。
+// 只在 pointermove 时改一个 CSS 变量，不开常驻动画循环；空闲时零开销。
+["queue", "idle-list"].forEach((id) => {
+  const ul = document.getElementById(id);
+  if (!ul) return;
+  ul.addEventListener("pointermove", (e) => {
+    const li = e.target.closest && e.target.closest("li:not(.empty-row)");
+    if (!li) return;
+    const r = li.getBoundingClientRect();
+    li.style.setProperty("--mx", Math.round(e.clientX - r.left) + "px");
+  }, { passive: true });
+});
+
+applyTheme("plain", false);

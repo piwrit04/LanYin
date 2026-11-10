@@ -17,9 +17,9 @@ from app import settings
 
 
 def test_theme_default_and_normalize():
-    assert normalize_theme(None) == DEFAULT_THEME == "wine"
+    assert normalize_theme(None) == DEFAULT_THEME == "plain"
     assert normalize_theme("blush") == "blush"
-    assert normalize_theme("PINK") == "wine"
+    assert normalize_theme("PINK") == "plain"
     assert normalize_theme("celadon") == "celadon"
     assert normalize_theme("inkgold") == "inkgold"
 
@@ -29,7 +29,7 @@ def test_theme_and_blacklist_defaults_on_old_config(tmp_path, monkeypatch):
     path.write_text("room_id: 42\n", encoding="utf-8")
     monkeypatch.setattr(settings, "CONFIG_PATH", path)
     cfg = settings.load_config()
-    assert cfg["console_theme"] == "wine"
+    assert cfg["console_theme"] == "plain"
     assert cfg["priority_queue"]["enabled"] is True
     assert cfg["blacklist"]["users"] == []
     assert cfg["blacklist"]["songs"] == []
