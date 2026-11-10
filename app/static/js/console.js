@@ -127,12 +127,14 @@ function connect() {
     const msg = JSON.parse(ev.data);
     if (msg.type === "state") {
       state = msg.payload;
+      noteNewLogs(state.logs || [], true);
       if (usingExternalPlayer() && audio && !audio.paused) audio.pause();
       render();
     } else if (msg.type === "log") {
       if (!state.logs) state.logs = [];
       if (!hasLogEntry(state.logs, msg.payload)) {
         state.logs.push(msg.payload);
+        noteNewLogs(state.logs, false);
         renderLogs();
       }
     } else if (msg.type === "progress") {
@@ -185,6 +187,31 @@ function setPill(id, on, text) {
   el.classList.toggle("off", !on);
   el.title = text;
   el.setAttribute("aria-label", text);
+  const st = el.querySelector(".st");
+  if (st) st.textContent = String(text).split("：").slice(1).join("：") || (on ? "正常" : "未连接");
+}
+
+// v36：四个状态合成一个。全部正常只显示绿点「一切正常」；否则琥珀点 + 第一项问题，悬停/点击看全部。
+function renderStatusSummary(problems) {
+  const wrap = document.getElementById("status-wrap");
+  const text = document.getElementById("status-text");
+  const btn = document.getElementById("status-summary");
+  if (!wrap || !text) return;
+  const ok = !problems.length;
+  wrap.classList.toggle("is-ok", ok);
+  wrap.classList.toggle("is-warn", !ok);
+  text.textContent = ok ? "一切正常" : problems[0] + (problems.length > 1 ? ` 等 ${problems.length} 项` : "");
+  if (btn) btn.title = ok ? "弹幕、B站账号、播放器、直播间都正常" : "有问题：" + problems.join("、") + "（点开看详情）";
+  const loginBtn = document.getElementById("btn-status-login");
+  if (loginBtn) loginBtn.hidden = !!state.bili_logged_in;
+}
+
+function setStatusOpen(open) {
+  const wrap = document.getElementById("status-wrap");
+  const btn = document.getElementById("status-summary");
+  if (!wrap) return;
+  wrap.classList.toggle("is-open", !!open);
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 function isIdleTrack(item) {
@@ -199,18 +226,23 @@ let lastSettingsSig = "";
 let lastLogSig = "";
 
 function render() {
+  const problems = [];
   setPill("pill-danmaku", !!state.danmaku_connected, state.danmaku_connected ? "弹幕：已连接" : "弹幕：未连接");
-  setPill("pill-login", !!state.bili_logged_in, state.bili_logged_in ? "B站发送：已登录" : "B站发送：未登录");
+  if (!state.danmaku_connected) problems.push("弹幕未连接");
+  setPill("pill-login", !!state.bili_logged_in, state.bili_logged_in ? "B站账号：已登录，可发弹幕" : "B站账号：未登录，发不了弹幕");
+  if (!state.bili_logged_in) problems.push("B站未登录");
   if (state.dedicated_player_connected) {
     setPill("pill-player", true, "播放器：独立页出声");
   } else if (state.console_window_connected && !isStandaloneWindow) {
     setPill("pill-player", true, "播放器：独立窗口出声");
   } else if (audioBlocked) {
     setPill("pill-player", false, "播放器：请点击开始出声");
+    problems.push("播放器没出声");
   } else {
     setPill("pill-player", true, "播放器：控制台出声");
   }
-  setPill("pill-room", true, `房间：${state.room_id || "-"}`);
+  setPill("pill-room", true, `直播间：${state.room_id || "-"}`);
+  renderStatusSummary(problems);
   renderNow();
   renderQueue();
   renderIdle();
@@ -321,7 +353,7 @@ function emptyState(opts) {
     : `<span class="empty-mark mark-folder" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${IC_NOTE}"/></svg></span>`;
   const title = opts.title ? `<p class="empty-title">${esc(opts.title)}</p>` : "";
   const chips = (opts.chips || []).length
-    ? `<span class="tag-stack" aria-label="弹幕示例">${opts.chips.map((c) => `<span class="cmd-chip">${esc(c)}</span>`).join("")}</span>`
+    ? `<span class="tag-stack" aria-label="弹幕示例"><span class="eg-label">例如</span>${opts.chips.map((c) => `<span class="cmd-chip">${esc(c)}</span>`).join("")}</span>`
     : "";
   const cls = ["muted", "empty-row", "empty-state", opts.kind === "logs" ? "empty-logs" : ""].filter(Boolean).join(" ");
   return `<${tag} class="${cls}">${mark}${title}<p class="empty-text">${esc(opts.text)}</p>${chips}</${tag}>`;
@@ -353,9 +385,64 @@ function sampleCoverColor(img) {
   return [Math.round(r / w), Math.round(g / w), Math.round(b / w)];
 }
 
+// 封面主色只保留色相/饱和度，亮度按主题收进固定区间（浅色主题偏亮、深色主题偏暗），
+// 再按 WCAG 相对亮度兜底（--glow-ymin / --glow-ymax）：蓝紫这类「看着亮其实暗」的颜色也不会把文字对比度拉低。
+function relLum(rgb) {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+}
+function hslRgb(h, sat, L) {
+  if (!sat) return [L, L, L].map((v) => Math.round(v * 255));
+  const hue2 = (p, q, t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = L < 0.5 ? L * (1 + sat) : L + sat - L * sat;
+  const p = 2 * L - q;
+  return [hue2(p, q, h + 1 / 3), hue2(p, q, h), hue2(p, q, h - 1 / 3)].map((v) => Math.round(v * 255));
+}
+function tuneGlowColor(rgb) {
+  if (!rgb) return null;
+  const cs = getComputedStyle(document.body);
+  const L0 = Number(cs.getPropertyValue("--glow-l")) || 0.7;
+  const maxS = Number(cs.getPropertyValue("--glow-s")) || 0.6;
+  const yMin = Number(cs.getPropertyValue("--glow-ymin")) || 0;
+  const yMax = Number(cs.getPropertyValue("--glow-ymax")) || 1;
+  const [r, g, b] = rgb.map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, sat = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  sat = Math.min(sat, maxS);
+  let out = hslRgb(h, sat, L0);
+  if (relLum(out) < yMin) {
+    let lo = L0, hi = 1;
+    for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (relLum(hslRgb(h, sat, m)) < yMin) lo = m; else hi = m; }
+    out = hslRgb(h, sat, hi);
+  } else if (relLum(out) > yMax) {
+    let lo = 0, hi = L0;
+    for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (relLum(hslRgb(h, sat, m)) > yMax) hi = m; else lo = m; }
+    out = hslRgb(h, sat, lo);
+  }
+  return out;
+}
+
+let glowRawRgb = null;
 function applyGlowColor(rgb) {
   const glow = document.getElementById("cover-glow");
   if (!glow) return;
+  glowRawRgb = rgb;
+  rgb = tuneGlowColor(rgb);
   const layers = glow.querySelectorAll(".glow-layer");
   if (layers.length < 2) return;
   const front = glow.querySelector(".glow-layer.is-front") || layers[0];
@@ -370,7 +457,9 @@ function applyGlowColor(rgb) {
 function setGlow(url, mode) {
   const glow = document.getElementById("cover-glow");
   if (!glow) return;
-  const stage = glow.closest(".stage");
+  glow.classList.toggle("is-playing", mode === "playing");
+  glow.classList.toggle("is-paused", mode === "paused");
+  const stage = document.querySelector(".stage");
   if (stage) {
     stage.classList.toggle("is-playing", mode === "playing");
     stage.classList.toggle("is-paused", mode === "paused");
@@ -414,24 +503,19 @@ function trackRow(item, opts) {
   const seasonTotal = Number(extra.season_total || item.season_total || 0);
   const seasonIndex = extra.season_index || item.season_index || 0;
   const seasonTitle = extra.season_title || item.season_title || "";
+  // v36：不再给默认歌单打标签（没标签 = 默认歌单），只有观众点的歌有「点歌」，舰长等身份另加。
   const tags = [];
-  if (idle && seasonTotal > 1) {
-    tags.push('<span class="tag tag-idle">合集' + (seasonIndex ? ` 第${seasonIndex}/${seasonTotal}` : "") + "</span>");
-  } else if (idle) {
-    tags.push('<span class="tag tag-idle">默认歌单</span>');
-  } else {
-    tags.push('<span class="tag tag-request">点歌</span>');
-  }
+  if (!idle) tags.push('<span class="tag tag-request">点歌</span>');
   if (pri && !idle) tags.push('<span class="tag tag-priority">' + pri + "</span>");
   const tag = tags.join("");
   const source = SOURCE_LABEL[item.source] || item.source || "";
   let who = "";
-  if (idle) {
-    who = seasonTitle && seasonTotal > 1 ? seasonTitle : "默认歌单";
-  } else if (item.requester_name) {
+  if (idle && seasonTotal > 1) {
+    who = (seasonTitle || "合集") + (seasonIndex ? ` 第 ${seasonIndex}/${seasonTotal}` : "");
+  } else if (!idle && item.requester_name) {
     who = "点歌人 " + item.requester_name;
   }
-  const subParts = [item.artist || "", source, who].filter(Boolean);
+  const subParts = [source, who].filter(Boolean);
   const actions = [];
   if (canMove) {
     const atStart = !!opts.atStart;
@@ -451,7 +535,7 @@ function trackRow(item, opts) {
       ${idx}
       <div class="q-cover"${img}></div>
       <div class="q-meta">
-        <div class="q-title">${esc(item.title)}</div>
+        <div class="q-line"><span class="q-title">${esc(item.title)}</span>${item.artist ? `<span class="q-artist">${esc(item.artist)}</span>` : ""}</div>
         <div class="q-sub">${esc(subParts.join(" · "))}</div>
       </div>
       <span class="q-tags">${tag}</span>
@@ -546,21 +630,21 @@ function renderIdle() {
     const source = item.kind === "bili"
       ? "哔哩哔哩"
       : (SOURCE_LABEL[item.source] || item.source || (item.query ? "按歌名搜索" : ""));
-    let who = "默认歌单";
+    let who = "";
     if (item.kind === "bili" && Number(item.season_total) > 1) {
       who = `${item.season_title || "合集"} 第 ${item.season_index || 1}/${item.season_total}`;
     }
-    const sub = [item.artist || "", source, who].filter(Boolean).join(" · ");
+    const sub = [source, who].filter(Boolean).join(" · ");
     const dur = item.duration ? fmt(item.duration) : "";
     return `
       <li draggable="true" data-id="${esc(item.id)}">
         <span class="q-idx">${i + 1}</span>
         <div class="q-cover"${img}></div>
         <div class="q-meta">
-          <div class="q-title">${esc(title)}</div>
+          <div class="q-line"><span class="q-title">${esc(title)}</span>${item.artist ? `<span class="q-artist">${esc(item.artist)}</span>` : ""}</div>
           <div class="q-sub">${esc(sub)}</div>
         </div>
-        <span class="q-tags"><span class="tag tag-idle">默认歌单</span></span>
+        <span class="q-tags"></span>
         <time class="q-time">${dur}</time>
         <div class="q-actions">${iconBtn("danger", `data-idle-del="${esc(item.id)}"`, "移除", IC_DEL)}</div>
       </li>`;
@@ -888,6 +972,7 @@ function activateListTab(name) {
   updateListCount();
 }
 
+let lastThemeId = "";
 function applyTheme(name, persist) {
   const id = THEME_IDS[name] ? name : "plain";
   document.documentElement.dataset.theme = id;
@@ -895,6 +980,8 @@ function applyTheme(name, persist) {
   document.querySelectorAll(".theme-swatch").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.theme === id);
   });
+  if (glowKey && lastThemeId && lastThemeId !== id) applyGlowColor(glowRawRgb);
+  lastThemeId = id;
   if (persist) {
     send({ type: "command", action: "update_settings", settings: { console_theme: id } });
   }
@@ -1000,13 +1087,101 @@ function renderLogs() {
     box.innerHTML = emptyState({ tag: "div", kind: "logs", text: "还没有记录，点歌和播放会出现在这里。" });
     return;
   }
-  box.innerHTML = logs.map((l) => {
+  const line = (l) => {
     const t = new Date((l.ts || 0) * 1000);
     const hh = t.toLocaleTimeString("zh-CN", { hour12: false });
     const cls = logKind(l.level, l.message || "");
     return `<div class="${cls}"><time>${esc(hh)}</time>${formatLogMessage(l.message)}</div>`;
-  }).join("");
+  };
+  box.innerHTML = logs.map(line).join("");
   box.scrollTop = box.scrollHeight;
+  renderLogStrip(logs[logs.length - 1], line);
+}
+
+function renderLogStrip(last, line) {
+  const msg = document.getElementById("log-strip-msg");
+  if (!msg) return;
+  msg.innerHTML = last ? line(last) : '<span class="muted">还没有记录，点歌和播放会出现在这里。</span>';
+}
+
+function setLogOpen(open) {
+  const dock = document.getElementById("log-dock");
+  const panel = document.getElementById("log-panel");
+  const strip = document.getElementById("log-strip");
+  if (!dock) return;
+  dock.classList.toggle("is-open", !!open);
+  if (panel) panel.setAttribute("aria-hidden", open ? "false" : "true");
+  if (strip) {
+    strip.setAttribute("aria-expanded", open ? "true" : "false");
+    strip.title = open ? "收起日志" : "展开日志";
+  }
+  if (open) {
+    const box = document.getElementById("logs");
+    if (box) box.scrollTop = box.scrollHeight;
+  }
+}
+
+// ---- 播放失败提示 ----
+// 服务器先把日志写进快照、再单独广播 log，两条先后不定，所以两条路都检查「比上次见过的更新的日志」。
+// 首次拿到快照只记下基线，不为旧日志弹提示。
+const TOAST_MAX = 2;
+const TOAST_MS = 4500;
+const FAIL_RE = /无法播放|没有找到可完整播放|只有试听|试听片段|播放失败|无法获取完整播放|无法继续|都无法播放|处理失败|播放器报错|音频加载失败|不可用|无法播放/;
+let toastBaseline = null;
+
+function isPlaybackFailure(l) {
+  if (!l) return false;
+  const m = String(l.message || "");
+  if (l.level === "error") return true;
+  // 「…改用 X」是自动换源成功，不算失败，不弹提示。
+  if (/改用/.test(m)) return false;
+  return l.level === "warn" && FAIL_RE.test(m);
+}
+
+function toastTitle(m) {
+  if (/只有试听|试听片段/.test(m)) return "只有试听";
+  if (/没有找到可完整播放|无法获取完整播放/.test(m)) return "找不到完整播放";
+  if (/不可用/.test(m)) return "音源不可用";
+  return "播放失败";
+}
+
+function noteNewLogs(logs, fromSnapshot) {
+  if (!logs || !logs.length) {
+    if (toastBaseline === null && fromSnapshot) toastBaseline = { id: -1, ts: 0 };
+    return;
+  }
+  const last = logs[logs.length - 1];
+  if (toastBaseline === null) {
+    toastBaseline = { id: last.id != null ? last.id : -1, ts: last.ts || 0 };
+    return;
+  }
+  const fresh = logs.filter((l) => (l.id != null && toastBaseline.id >= 0 ? l.id > toastBaseline.id : (l.ts || 0) > toastBaseline.ts));
+  if (!fresh.length) return;
+  const nl = fresh[fresh.length - 1];
+  toastBaseline = { id: nl.id != null ? nl.id : toastBaseline.id, ts: Math.max(toastBaseline.ts, nl.ts || 0) };
+  fresh.filter(isPlaybackFailure).slice(-TOAST_MAX).forEach((l) => showToast(toastTitle(String(l.message || "")), l.message, l.level));
+}
+
+function showToast(title, message, level) {
+  const box = document.getElementById("toasts");
+  if (!box) return;
+  const el = document.createElement("div");
+  el.className = "toast " + (level === "error" ? "toast-error" : "toast-warn");
+  el.innerHTML = `<i class="toast-bar" aria-hidden="true"></i><div class="toast-body"><strong>${esc(title)}</strong><p>${formatLogMessage(message)}</p></div>`;
+  box.appendChild(el);
+  // 最多 2 条：新的一条进来，最早的那条直接让位。
+  while (box.children.length > TOAST_MAX) box.firstElementChild.remove();
+  // 下一帧加 is-in 触发 opacity/translate 过渡；到时间后淡出再移除。不开常驻循环。
+  setTimeout(() => el.classList.add("is-in"), 20);
+  const hide = () => {
+    el.classList.remove("is-in");
+    el.classList.add("is-out");
+    setTimeout(() => el.remove(), 320);
+  };
+  let timer = setTimeout(hide, TOAST_MS);
+  el.addEventListener("mouseenter", () => clearTimeout(timer));
+  el.addEventListener("mouseleave", () => { timer = setTimeout(hide, 1500); });
+  el.addEventListener("click", hide);
 }
 
 function updateListCount() {
@@ -1368,9 +1543,38 @@ document.addEventListener("click", (e) => {
   const wrap = document.querySelector(".stage-more");
   if (menu && !menu.hidden && wrap && !wrap.contains(e.target)) setMoreMenu(false);
 });
+const statusBtn = document.getElementById("status-summary");
+if (statusBtn) {
+  statusBtn.onclick = (e) => {
+    e.stopPropagation();
+    const wrap = document.getElementById("status-wrap");
+    setStatusOpen(!(wrap && wrap.classList.contains("is-open")));
+  };
+}
+const statusLogin = document.getElementById("btn-status-login");
+if (statusLogin) {
+  statusLogin.onclick = () => {
+    setStatusOpen(false);
+    setSettingsOpen(true);
+    activateSettingsTab("login");
+  };
+}
+document.addEventListener("click", (e) => {
+  const wrap = document.getElementById("status-wrap");
+  if (wrap && wrap.classList.contains("is-open") && !wrap.contains(e.target)) setStatusOpen(false);
+});
+const logStrip = document.getElementById("log-strip");
+if (logStrip) {
+  logStrip.onclick = () => {
+    const dock = document.getElementById("log-dock");
+    setLogOpen(!(dock && dock.classList.contains("is-open")));
+  };
+}
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   setMoreMenu(false);
+  setStatusOpen(false);
+  setLogOpen(false);
   if (document.body.classList.contains("settings-open")) setSettingsOpen(false);
 });
 

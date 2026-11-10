@@ -4,11 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音控制台</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=35" />
-  <link rel="stylesheet" href="/static/css/console.css?v=35" />
+  <link rel="stylesheet" href="/static/css/common.css?v=37" />
+  <link rel="stylesheet" href="/static/css/console.css?v=37" />
 </head>
 <body data-theme="plain">
   <div class="atmosphere" aria-hidden="true"></div>
+  <!-- v36 整页封面取色光晕：一层固定的大 radial-gradient（两张子层只在换歌时交叉淡入），
+       播放时只做透明度+平移的慢呼吸；不用 filter / backdrop-filter。 -->
+  <div class="cover-glow" id="cover-glow" aria-hidden="true"><span class="glow-layer is-front"></span><span class="glow-layer"></span></div>
   <div class="app">
     <header class="topbar">
       <div class="brand">
@@ -30,11 +33,19 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H7v10h10v-4h2v6H5V5z"/></svg>
           弹出窗口
         </button>
-        <div class="status">
-          <span id="pill-danmaku" class="off" title="弹幕：未连接"><i></i>弹幕</span>
-          <span id="pill-login" class="off" title="B站发送：未登录"><i></i>登录</span>
-          <span id="pill-player" class="off" title="播放器：未打开"><i></i>播放器</span>
-          <span id="pill-room" class="on" title="房间：-"><i></i>房间</span>
+        <!-- v36：四个状态灯合成一个。全部正常只亮一颗绿点；有问题时变琥珀色并写出哪一项不对。
+             点击或悬停展开小浮层，原来的四个 pill（id 不变）放在浮层里。 -->
+        <div class="status-wrap" id="status-wrap">
+          <button type="button" class="status-summary" id="status-summary" aria-haspopup="dialog" aria-expanded="false" aria-controls="status-pop">
+            <i class="status-dot" aria-hidden="true"></i><span id="status-text">正在连接…</span>
+          </button>
+          <div class="status-pop status" id="status-pop" role="dialog" aria-label="连接状态">
+            <span id="pill-danmaku" class="off" title="弹幕：未连接"><i></i><b>弹幕</b><em class="st">未连接</em></span>
+            <span id="pill-login" class="off" title="B站账号：未登录"><i></i><b>B站账号（发弹幕）</b><em class="st">未登录</em></span>
+            <span id="pill-player" class="off" title="播放器：未打开"><i></i><b>播放器</b><em class="st">未打开</em></span>
+            <span id="pill-room" class="on" title="房间：-"><i></i><b>直播间</b><em class="st">-</em></span>
+            <button type="button" class="status-login-btn" id="btn-status-login" hidden>扫码登录 B 站</button>
+          </div>
         </div>
         <button type="button" class="btn-settings" id="btn-settings" aria-haspopup="dialog" aria-controls="settings-drawer">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54A.48.48 0 0 0 14.9 2h-3.8a.48.48 0 0 0-.48.41l-.36 2.54c-.59.22-1.14.54-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L3.73 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.85 14.52a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.31.59.22l2.39-.96c.5.4 1.04.72 1.63.94l.36 2.54c.05.24.25.41.48.41h3.8c.24 0 .44-.17.48-.41l.36-2.54c.59-.22 1.14-.54 1.63-.94l2.39.96c.22.09.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 15.6 12 3.6 3.6 0 0 1 12 15.6z"/></svg>
@@ -45,32 +56,9 @@
 
     <div class="shell">
       <div class="col-player">
-        <section class="stage card">
-          <!-- 封面取色光晕：两层预先柔化的 radial-gradient，只做透明度和平移动画（不用 filter/backdrop-filter）。 -->
-          <div class="cover-glow" id="cover-glow" aria-hidden="true"><span class="glow-layer is-front"></span><span class="glow-layer"></span></div>
-          <div class="stage-more">
-            <button type="button" class="btn-icon more-btn" id="btn-more" title="更多操作" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false" aria-controls="now-more-menu">
-              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10.5A1.5 1.5 0 1 1 6 13.5 1.5 1.5 0 0 1 6 10.5zm6 0A1.5 1.5 0 1 1 12 13.5 1.5 1.5 0 0 1 12 10.5zm6 0A1.5 1.5 0 1 1 18 13.5 1.5 1.5 0 0 1 18 10.5z"/></svg>
-            </button>
-            <div class="more-menu" id="now-more-menu" role="menu" hidden>
-              <button type="button" class="menu-item" id="btn-add-idle" role="menuitem" disabled>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                添加到默认歌单
-              </button>
-              <button type="button" class="menu-item danger" id="btn-block-song" role="menuitem" disabled>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.3 13.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9 2.9 2.9z"/></svg>
-                拉黑这首歌
-              </button>
-              <button type="button" class="menu-item danger" id="btn-clear" role="menuitem">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z"/></svg>
-                清空队列
-              </button>
-            </div>
-          </div>
-          <div class="cover-stage vinyl">
-            <div class="vinyl-disc">
-              <div class="cover" id="cover"></div>
-            </div>
+        <section class="stage">
+          <div class="cover-stage album">
+            <div class="cover" id="cover"></div>
           </div>
           <div class="now-info">
             <div class="now-head">
@@ -81,6 +69,7 @@
             <p class="artist" id="now-artist"></p>
             <p class="meta" id="now-meta">打开本页即可出声。把覆盖层加到 OBS 给观众看选歌和封面。</p>
             <div class="lyric" id="now-lyric" hidden></div>
+            <p class="next next-line" id="now-next" hidden></p>
           </div>
           <div class="progress">
             <time id="now-pos">00:00</time>
@@ -112,16 +101,30 @@
               <input id="volume" type="range" min="0" max="100" value="80" aria-label="音量" />
               <span id="volume-val">80%</span>
             </label>
+            <div class="stage-more">
+            <button type="button" class="btn-icon more-btn" id="btn-more" title="更多操作" aria-label="更多操作" aria-haspopup="menu" aria-expanded="false" aria-controls="now-more-menu">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10.5A1.5 1.5 0 1 1 6 13.5 1.5 1.5 0 0 1 6 10.5zm6 0A1.5 1.5 0 1 1 12 13.5 1.5 1.5 0 0 1 12 10.5zm6 0A1.5 1.5 0 1 1 18 13.5 1.5 1.5 0 0 1 18 10.5z"/></svg>
+            </button>
+            <div class="more-menu" id="now-more-menu" role="menu" hidden>
+              <button type="button" class="menu-item" id="btn-add-idle" role="menuitem" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                添加到默认歌单
+              </button>
+              <button type="button" class="menu-item danger" id="btn-block-song" role="menuitem" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.3 13.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9 2.9 2.9z"/></svg>
+                拉黑这首歌
+              </button>
+              <button type="button" class="menu-item danger" id="btn-clear" role="menuitem">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z"/></svg>
+                清空队列
+              </button>
+            </div>
           </div>
-          <p class="next next-line" id="now-next" hidden></p>
-        </section>
-        <section class="card logs-card slim">
-          <div class="logs-head">日志</div>
-          <div class="logs" id="logs"><div class="empty-row empty-state empty-logs"><span class="empty-mark mark-logs" aria-hidden="true"><i></i><i></i><i></i></span><p class="empty-text">还没有记录，点歌和播放会出现在这里。</p></div></div>
+          </div>
         </section>
       </div>
 
-      <section class="card lists-card">
+      <section class="lists-card">
         <div class="list-head">
           <div class="lists-tabs glass-tabs compact-tabs" id="lists-tabs" role="tablist">
             <span class="glass-tabs-ink" id="list-tab-ink" aria-hidden="true"></span>
@@ -132,7 +135,7 @@
         </div>
         <div class="lists-body">
           <div class="list-pane is-active" data-list="queue">
-            <ul class="queue song-list" id="queue"><li class="muted empty-row empty-state"><span class="empty-mark mark-folder" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span><p class="empty-title">等待第一首点歌</p><p class="empty-text">还没有歌曲，观众发送「点歌 歌名」后会显示在这里。</p><span class="tag-stack" aria-label="弹幕示例"><span class="cmd-chip">点歌 晴天</span><span class="cmd-chip">点歌 夜曲</span><span class="cmd-chip">点歌 BV 号</span></span></li></ul>
+            <ul class="queue song-list" id="queue"><li class="muted empty-row empty-state"><span class="empty-mark mark-folder" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span><p class="empty-title">等待第一首点歌</p><p class="empty-text">还没有歌曲，观众发送「点歌 歌名」后会显示在这里。</p><span class="tag-stack" aria-label="弹幕示例"><span class="eg-label">例如</span><span class="cmd-chip">点歌 晴天</span><span class="cmd-chip">点歌 夜曲</span><span class="cmd-chip">点歌 BV 号</span></span></li></ul>
           </div>
           <div class="list-pane" data-list="idle">
             <ul class="idle-list song-list" id="idle-list"></ul>
@@ -145,10 +148,26 @@
             </div>
           </div>
           <div id="selection" class="selection-overlay"></div>
+          <!-- 播放失败提示：列表顶部居中，最多 2 条，约 4.5 秒后自动消失；不挡最后几行、时长和播放控制。 -->
+          <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
         </div>
       </section>
     </div>
+
+    <!-- v36 日志：底部一条只显示最新一条；点一下向上展开完整日志（只做透明度+平移），再点收起。 -->
+    <div class="log-dock" id="log-dock">
+      <section class="logs-card log-panel" id="log-panel" aria-label="日志" aria-hidden="true">
+        <div class="logs-head"><span>日志</span><span class="logs-hint">再点一下底部收起</span></div>
+        <div class="logs" id="logs"><div class="empty-row empty-state empty-logs"><span class="empty-mark mark-logs" aria-hidden="true"><i></i><i></i><i></i></span><p class="empty-text">还没有记录，点歌和播放会出现在这里。</p></div></div>
+      </section>
+      <button type="button" class="log-strip" id="log-strip" aria-expanded="false" aria-controls="log-panel" title="展开日志">
+        <span class="log-strip-label">日志</span>
+        <span class="log-strip-msg" id="log-strip-msg"><span class="muted">还没有记录，点歌和播放会出现在这里。</span></span>
+        <svg class="log-strip-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.4 15.4 12 10.8l4.6 4.6L18 14l-6-6-6 6z"/></svg>
+      </button>
+    </div>
   </div>
+
 
   <div class="drawer-backdrop" id="settings-backdrop" hidden></div>
   <aside class="settings-drawer settings-card" id="settings-drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true">
@@ -399,7 +418,7 @@
   </aside>
 
   <audio id="console-audio" preload="auto"></audio>
-  <script src="/static/js/common.js?v=35"></script>
-  <script src="/static/js/console.js?v=35"></script>
+  <script src="/static/js/common.js?v=37"></script>
+  <script src="/static/js/console.js?v=37"></script>
 </body>
 </html>

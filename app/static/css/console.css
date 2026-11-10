@@ -34,6 +34,15 @@
 
 /* ---------- 素白 plain (default, basic clean white) ---------- */
 :root, html[data-theme="plain"], body[data-theme="plain"] {
+  /* v36 整页光晕：封面色的亮度被收进 --glow-l，饱和度上限 --glow-s；--surface 是半透明的列表底。 */
+  --glow-l: 0.50;
+  --glow-s: 0.70;
+  --glow-a1: 0.44;
+  --glow-a2: 0.16;
+  --glow-ymin: 0.30;
+  --glow-ymax: 1;
+  --surface: color-mix(in srgb, var(--panel-strong) 62%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text) 5%, transparent);
   --bg: #f3f4f6;
   --bg-soft: #ffffff;
   --panel: #ffffff;
@@ -42,7 +51,7 @@
   --line: #e2e4e8;
   --line-strong: #c9ced6;
   --text: #1c1e21;
-  --muted: #5a6270;
+  --muted: #4d5462;
   --faint: #6b7280;
   --time: #5a6270;
   --disabled: #9aa1ab;
@@ -106,8 +115,6 @@
   --tag-text: #1d4ed8;
   --tag-neutral-bg: color-mix(in srgb, var(--text) 7%, transparent);
   --glow-neutral: 148 163 184;
-  --glow-a1: 0.50;
-  --glow-a2: 0.16;
   --kicker: #5a6270;
   --log-user: #0d7370;
   --log-song: #9a5410;
@@ -116,6 +123,15 @@
 
 /* ---------- 酒夜 wine ---------- */
 html[data-theme="wine"], body[data-theme="wine"] {
+  /* v36 整页光晕：封面色的亮度被收进 --glow-l，饱和度上限 --glow-s；--surface 是半透明的列表底。 */
+  --glow-l: 0.50;
+  --glow-s: 0.62;
+  --glow-a1: 0.70;
+  --glow-a2: 0.18;
+  --glow-ymin: 0;
+  --glow-ymax: 0.07;
+  --surface: color-mix(in srgb, var(--panel-strong) 55%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text) 5%, transparent);
   --bg: #1d0708;
   --bg-soft: #2a1014;
   --panel: rgba(61, 27, 31, 0.72);
@@ -192,8 +208,6 @@ html[data-theme="wine"], body[data-theme="wine"] {
   --tag-text: #f7a8c0;
   --tag-neutral-bg: color-mix(in srgb, var(--text) 7%, transparent);
   --glow-neutral: 178 33 46;
-  --glow-a1: 0.50;
-  --glow-a2: 0.16;
   --kicker: #cbb6bc;
   --log-user: #7ed0c8;
   --log-song: #f3c48a;
@@ -202,6 +216,15 @@ html[data-theme="wine"], body[data-theme="wine"] {
 
 /* ---------- 粉白 blush ---------- */
 html[data-theme="blush"], body[data-theme="blush"] {
+  /* v36 整页光晕：封面色的亮度被收进 --glow-l，饱和度上限 --glow-s；--surface 是半透明的列表底。 */
+  --glow-l: 0.52;
+  --glow-s: 0.66;
+  --glow-a1: 0.42;
+  --glow-a2: 0.15;
+  --glow-ymin: 0.32;
+  --glow-ymax: 1;
+  --surface: color-mix(in srgb, var(--panel-strong) 62%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text) 5%, transparent);
   --bg: #fff4f7;
   --bg-soft: #ffe8ef;
   --panel: rgba(255, 255, 255, 0.82);
@@ -210,7 +233,7 @@ html[data-theme="blush"], body[data-theme="blush"] {
   --line: #f0c2ce;
   --line-strong: #e3a0b3;
   --text: #4a1f2d;
-  --muted: #8a4d5f;
+  --muted: #743a4c;
   --faint: #a06173;
   --time: #8a4d5f;
   --disabled: #c08a98;
@@ -278,8 +301,6 @@ html[data-theme="blush"], body[data-theme="blush"] {
   --tag-text: #a3143e;
   --tag-neutral-bg: color-mix(in srgb, var(--text) 7%, transparent);
   --glow-neutral: 228 140 165;
-  --glow-a1: 0.46;
-  --glow-a2: 0.14;
   --kicker: #8a4d5f;
   --log-user: #0d7370;
   --log-song: #9a5410;
@@ -288,6 +309,15 @@ html[data-theme="blush"], body[data-theme="blush"] {
 
 /* ---------- 墨金 inkgold ---------- */
 html[data-theme="inkgold"], body[data-theme="inkgold"] {
+  /* v36 整页光晕：封面色的亮度被收进 --glow-l，饱和度上限 --glow-s；--surface 是半透明的列表底。 */
+  --glow-l: 0.50;
+  --glow-s: 0.55;
+  --glow-a1: 0.62;
+  --glow-a2: 0.16;
+  --glow-ymin: 0;
+  --glow-ymax: 0.065;
+  --surface: color-mix(in srgb, var(--panel-strong) 55%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text) 5%, transparent);
   --bg: #16130e;
   --bg-soft: #1e1a13;
   --panel: rgba(36, 30, 20, 0.72);
@@ -364,8 +394,6 @@ html[data-theme="inkgold"], body[data-theme="inkgold"] {
   --tag-text: #e6c578;
   --tag-neutral-bg: color-mix(in srgb, var(--text) 7%, transparent);
   --glow-neutral: 212 168 75;
-  --glow-a1: 0.36;
-  --glow-a2: 0.11;
   --kicker: #c6b48a;
   --log-user: #7ed0c8;
   --log-song: #f3c48a;
@@ -374,6 +402,15 @@ html[data-theme="inkgold"], body[data-theme="inkgold"] {
 
 /* ---------- 青瓷 celadon ---------- */
 html[data-theme="celadon"], body[data-theme="celadon"] {
+  /* v36 整页光晕：封面色的亮度被收进 --glow-l，饱和度上限 --glow-s；--surface 是半透明的列表底。 */
+  --glow-l: 0.50;
+  --glow-s: 0.62;
+  --glow-a1: 0.42;
+  --glow-a2: 0.15;
+  --glow-ymin: 0.30;
+  --glow-ymax: 1;
+  --surface: color-mix(in srgb, var(--panel-strong) 62%, transparent);
+  --surface-hover: color-mix(in srgb, var(--text) 5%, transparent);
   --bg: #e8f0ea;
   --bg-soft: #f3f7f3;
   --panel: rgba(247, 251, 247, 0.82);
@@ -382,7 +419,7 @@ html[data-theme="celadon"], body[data-theme="celadon"] {
   --line: #c5d6cb;
   --line-strong: #9fb8a8;
   --text: #1a3328;
-  --muted: #3e5c4e;
+  --muted: #334c40;
   --faint: #4f6f5f;
   --time: #3e5c4e;
   --disabled: #7a9488;
@@ -450,8 +487,6 @@ html[data-theme="celadon"], body[data-theme="celadon"] {
   --tag-text: #8e2f22;
   --tag-neutral-bg: color-mix(in srgb, var(--text) 7%, transparent);
   --glow-neutral: 95 140 115;
-  --glow-a1: 0.44;
-  --glow-a2: 0.14;
   --kicker: #3e5c4e;
   --log-user: #0d7370;
   --log-song: #9a5410;
@@ -751,49 +786,48 @@ body.is-standalone .btn-popout { display: none; }
 }
 .stage .cover { background-color: var(--cover-bg); }
 
-/* ---- 封面取色光晕 (Apple Music / Endel 式慢呼吸) ----
-   预先柔化的大 radial-gradient；颜色切换时两层交叉淡入，播放时容器 10s 一次透明度+平移呼吸。
-   不用 filter / backdrop-filter / box-shadow 动画，--disable-gpu 下也只是合成透明度。 */
-.stage > :not(.cover-glow):not(.stage-more) { position: relative; z-index: 1; }
+/* ---- v36 整页封面取色光晕 (Apple Music / Endel 式慢呼吸) ----
+   一层 position:fixed 的大 radial-gradient 铺满整页、垫在所有内容下面；两张子层只在换歌时交叉淡入。
+   播放时容器 12s 一次透明度+平移呼吸（steps 降低更新频率），暂停/空闲完全静止。
+   不用 filter / backdrop-filter / box-shadow 动画；--disable-gpu 下也只是合成一层透明度。 */
 .cover-glow {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  inset: -40px;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  border-radius: inherit;
-  opacity: 0.55;
+  opacity: 0.5;
   transition: opacity 1.2s ease;
+  will-change: opacity, transform;
 }
 .glow-layer {
   --glow-rgb: var(--glow-neutral);
   position: absolute;
-  left: 50%;
-  top: -170px;
-  width: 680px;
-  height: 600px;
-  margin-left: -340px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side,
-    rgb(var(--glow-rgb) / var(--glow-a1)) 0%,
-    rgb(var(--glow-rgb) / var(--glow-a2)) 55%,
-    rgb(var(--glow-rgb) / 0) 100%);
+  inset: 0;
+  /* 平缓的透明度曲线：中心在封面后面，向外很慢地淡出，整页都带一点封面色；右下再垫一团弱光。 */
+  background:
+    radial-gradient(75% 90% at 22% 36%,
+      rgb(var(--glow-rgb) / var(--glow-a1)) 0%,
+      rgb(var(--glow-rgb) / calc(var(--glow-a1) * 0.62)) 40%,
+      rgb(var(--glow-rgb) / var(--glow-a2)) 72%,
+      rgb(var(--glow-rgb) / 0) 100%),
+    radial-gradient(60% 70% at 88% 96%,
+      rgb(var(--glow-rgb) / calc(var(--glow-a2) * 1.6)) 0%,
+      rgb(var(--glow-rgb) / 0) 100%);
   opacity: 0;
   transition: opacity 1.6s ease;
-  will-change: opacity;
 }
 .glow-layer.is-front { opacity: 1; }
-.stage.is-paused .cover-glow { opacity: 0.7; }
-.stage.is-playing .cover-glow {
-  opacity: 0.8;
-  /* steps(60)：10 秒只更新 60 次（每步约 1% 透明度、0.3px 位移，肉眼看不出跳变），
-     在 --disable-gpu 的软件合成下比逐帧动画省约一半开销。 */
-  animation: glow-breathe 10s steps(60, jump-none) infinite;
-  will-change: opacity, transform;
+.cover-glow.has-color { opacity: 0.85; }
+.cover-glow.is-paused { opacity: 0.72; }
+.cover-glow.is-playing {
+  opacity: 1;
+  /* steps(48)：12 秒只更新 48 次（每步约 1% 透明度、0.5px 位移，看不出跳变）。 */
+  animation: glow-breathe 12s steps(48, jump-none) infinite;
 }
 @keyframes glow-breathe {
-  0%, 100% { opacity: 0.62; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(10px); }
+  0%, 100% { opacity: 0.78; transform: translate3d(0, 0, 0); }
+  50% { opacity: 1; transform: translate3d(14px, 18px, 0); }
 }
 .now-info {
   min-width: 0;
@@ -1683,10 +1717,10 @@ input.switch:focus { box-shadow: var(--focus-ring); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stage.is-playing .cover-glow, .live-eq i, .dot-matrix i {
+  .cover-glow.is-playing, .live-eq i, .dot-matrix i {
     animation: none !important;
   }
-  .stage.is-playing .cover-glow { opacity: 0.8; transform: none; }
+  .cover-glow.is-playing { opacity: 0.9; transform: none; }
   .live-eq i:first-child, .dot-matrix i { opacity: 0.8; }
   .glow-layer, .cover-glow { transition: none; }
   .glass-tabs-ink, .settings-drawer { transition: none; }
@@ -1696,11 +1730,361 @@ input.switch:focus { box-shadow: var(--focus-ring); }
 body.is-standalone .atmosphere {
   background: var(--bg);
 }
-body.is-standalone .card,
-body.is-standalone .topbar,
 body.is-standalone .settings-drawer {
   background: var(--panel-strong);
 }
 
 /* v34: 设置抽屉里标签栏和下方说明文字留出间距 */
 #settings-tabs { margin-bottom: 12px; max-width: 100%; }
+
+/* =====================================================================
+   v36「安静的播放器」：整页光晕 + 大封面 + 少分区（Apple Music / Plexamp / Linear）
+   - 去掉黑胶，换成大圆角方形封面；左侧不再是卡片，只有留白。
+   - 列表一块半透明底、无边框无阴影；行操作按钮悬停/聚焦才出现。
+   - 日志收成底部一条最新消息，点开向上展开完整日志。
+   - 顶栏四个状态灯合成一个。
+   ===================================================================== */
+.topbar {
+  background: color-mix(in srgb, var(--topbar-bg) 82%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  position: relative;
+  z-index: 6;
+}
+.shell {
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 48px;
+  padding: 24px 40px 12px;
+}
+.col-player { position: relative; justify-content: center; gap: 0; }
+
+/* ---- 正在播放：无卡片，大封面 ---- */
+.stage {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: auto 0;
+  gap: 4px;
+  overflow: visible;
+}
+.stage > * { position: relative; z-index: 1; }
+.stage .row-actions { position: relative; z-index: 3; }
+.row-actions .stage-more { position: relative; top: auto; right: auto; z-index: 4; flex: none; }
+.row-actions .more-btn { border: 0; background: transparent; box-shadow: none; color: var(--muted); }
+.row-actions .more-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.row-actions .more-menu { top: auto; bottom: calc(100% + 6px); right: 0; text-align: left; }
+.cover-stage.album {
+  --cover-size: clamp(180px, calc(100vh - 500px), 320px);
+  width: var(--cover-size);
+  height: var(--cover-size);
+  max-width: 100%;
+  margin: 0 0 22px;
+  border-radius: 14px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23808590' fill-opacity='.45' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E") center / 30% no-repeat,
+    var(--cover-bg);
+}
+.cover-stage.album::before { content: none; }
+.stage .cover-stage.album .cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  background-color: transparent;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent), 0 22px 44px -18px rgba(0, 0, 0, 0.45);
+  transform: scale(1);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* 暂停时封面轻轻缩小一点（Apple Music 式），只用 transform，事件触发、不常驻。 */
+.stage.is-paused .cover-stage.album .cover { transform: scale(0.94); }
+.stage .title,
+.stage .title-track .title { font-size: 24px; line-height: 1.3; }
+.stage .artist { font-size: 15px; margin-top: 2px; }
+.stage .meta { margin-top: 2px; }
+.stage .lyric { font-size: 15px; margin-top: 10px; }
+/* 「下一首」：比 v35 稍亮、字重稍高，仍是次要信息。 */
+.stage .next {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text) 62%, var(--muted));
+}
+.stage .progress { max-width: 320px; margin-top: 18px; }
+.stage .row-actions { max-width: 320px; }
+
+/* ---- 列表：一块半透明底，无边框无阴影 ---- */
+.lists-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 14px 12px 12px;
+  overflow: hidden;
+}
+.list-head { padding: 0 6px; }
+.glass-tabs.compact-tabs, .lists-tabs { border-color: transparent; box-shadow: none; }
+/* 当前行标题用更深的强调色（--tag-text），叠在光晕和高亮底上仍 ≥ 4.5:1。 */
+.queue li.current .q-title { color: var(--tag-text); }
+.stage .kicker { color: color-mix(in srgb, var(--kicker) 70%, var(--text)); }
+
+.song-list li, .queue li, .idle-list li {
+  position: relative;
+  /* 序号 | 封面 | 标题两行 | 标记列（固定宽，点歌/舰长竖向对齐） | 时长（宽度够放三颗操作按钮） */
+  grid-template-columns: 24px 44px minmax(0, 1fr) 96px 88px;
+  gap: 12px;
+  padding: 8px 10px;
+}
+.song-list li.empty-row { position: static; }
+.song-list li:not(.empty-row):hover,
+.queue li.current:hover { background: var(--surface-hover); }
+.queue li.current, .queue li.current:hover { background: var(--row-current); }
+.q-cover, .thumb { width: 44px; height: 44px; border-radius: 8px; border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent); }
+.q-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.q-line .q-title { flex: 0 1 auto; min-width: 0; }
+.q-artist { flex: 0 1 auto; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song-list .q-tags { display: flex; justify-content: flex-start; align-items: center; gap: 4px; min-width: 0; }
+.song-list .q-time { width: auto; text-align: right; }
+.q-sub { margin-top: 1px; }
+.q-time { transition: opacity 0.15s ease; }
+/* 行操作按钮：平时隐藏，鼠标移上或键盘聚焦到这一行才出现（盖在时长上方）。 */
+.q-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  /* 悬停时时长淡出，按钮直接放在原位置，不另垫底色块。 */
+  background: none;
+  transition: opacity 0.15s ease;
+}
+.q-actions:empty { display: none; }
+.song-list li:hover .q-actions,
+.song-list li:focus-within .q-actions { opacity: 1; pointer-events: auto; }
+.song-list li:hover .q-actions:not(:empty) ~ .q-time,
+.song-list li:focus-within .q-actions:not(:empty) ~ .q-time { opacity: 0; }
+.song-list li:has(.q-actions:not(:empty)):hover .q-time,
+.song-list li:has(.q-actions:not(:empty)):focus-within .q-time { opacity: 0; }
+@media (hover: none) {
+  .q-actions { position: static; transform: none; opacity: 1; pointer-events: auto; background: none; padding-left: 0; }
+  .song-list li { grid-template-columns: 24px 44px minmax(0, 1fr) 96px auto auto; }
+  .song-list li:has(.q-actions:not(:empty)) .q-time { opacity: 1; }
+}
+
+/* ---- 空状态示例：不是按钮，是「例如」后面的一段示例文字 ---- */
+.tag-stack { gap: 4px 8px; margin-top: 14px; }
+.eg-label { font-size: 12px; color: var(--muted); }
+.cmd-chip {
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+  line-height: 22px;
+  padding: 0 6px;
+  cursor: text;
+  user-select: all;
+}
+.empty-mark.mark-folder { background: color-mix(in srgb, var(--text) 5%, transparent); box-shadow: none; }
+.empty-mark.mark-folder::before { background: color-mix(in srgb, var(--text) 7%, transparent); }
+
+/* ---- 顶栏：一个状态点 ---- */
+.status-wrap { position: relative; }
+.status-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ok-text);
+}
+.status-summary:hover { border-color: var(--line); color: var(--ok-text); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok-text); display: inline-block; flex: none; }
+.status-wrap.is-ok .status-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok-text) 20%, transparent); }
+.status-wrap.is-warn .status-summary {
+  color: color-mix(in srgb, var(--log-song) 78%, var(--text));
+  background: color-mix(in srgb, var(--amber) 13%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+}
+.status-wrap.is-warn .status-dot { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 24%, transparent); }
+.status-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
+}
+.status-wrap.is-open .status-pop,
+.status-wrap:focus-within .status-pop { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+@media (hover: hover) {
+  .status-wrap:hover .status-pop { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+}
+.status-pop span {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.status-pop span b { font-weight: 500; white-space: nowrap; }
+.status-pop span .st { font-style: normal; font-size: 12px; text-align: right; white-space: nowrap; }
+.status-pop span.on, .status-pop span.off { color: var(--text); }
+.status-pop span.on .st { color: var(--ok-text); }
+.status-pop span.off .st { color: var(--log-song); font-weight: 600; }
+.status-pop span i { width: 8px; height: 8px; }
+.status-pop span.on i { background: var(--ok-text); box-shadow: none; }
+.status-pop span.off i { background: var(--amber); }
+.status-pop span.off { background: color-mix(in srgb, var(--amber) 9%, transparent); }
+.status-login-btn { margin: 6px 8px 2px; height: 30px; font-size: 13px; }
+
+/* ---- 底部日志条 + 向上展开的日志面板 ---- */
+.log-dock { position: relative; flex: none; padding: 0 40px 14px; z-index: 5; }
+.log-strip {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+.log-strip:hover { border: 0; background: color-mix(in srgb, var(--panel-strong) 80%, transparent); }
+.log-strip:active { transform: none; box-shadow: none; }
+.log-strip-label { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); }
+.log-strip-msg { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.log-strip-msg > div { display: inline; position: relative; padding-left: 8px; }
+.log-strip-msg time { color: var(--muted); margin-right: 8px; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 12px; }
+.log-strip-msg .log-user { color: var(--log-user); font-weight: 600; }
+.log-strip-msg .log-song { color: var(--log-song); font-weight: 600; }
+.log-strip-msg .log-artist { color: var(--log-artist); font-weight: 500; }
+.log-strip-msg .log-warn::before,
+.log-strip-msg .log-error::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--amber); }
+.log-strip-msg .log-error::before { background: var(--danger); }
+.log-strip-chev { width: 16px; height: 16px; fill: var(--muted); flex: none; transition: transform 0.2s ease; }
+.log-dock.is-open .log-strip-chev { transform: rotate(180deg); }
+.log-panel {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  bottom: 58px;
+  height: min(48vh, 380px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  box-shadow: 0 20px 44px -16px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s linear 0.22s;
+}
+.log-dock.is-open .log-panel { opacity: 1; visibility: visible; transform: none; pointer-events: auto; transition-delay: 0s; }
+.log-panel .logs-head { display: flex; justify-content: space-between; align-items: baseline; color: var(--text); }
+.logs-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+/* 日志框本身去掉边框和底色，只留文字。 */
+.log-panel .logs { background: transparent; border: 0; padding: 4px 2px; }
+
+/* ---- 播放失败提示 ---- */
+.lists-card { position: relative; }
+.toasts {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(320px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  box-shadow: 0 14px 32px -12px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast.is-in { opacity: 1; transform: none; }
+.toast.is-out { opacity: 0; transform: translateY(-8px); }
+.toast-bar { flex: none; width: 3px; border-radius: 2px; background: var(--amber); }
+.toast-error .toast-bar { background: var(--danger); }
+.toast-body { min-width: 0; }
+.toast-body strong { display: block; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4; }
+.toast-body p { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.toast-body .log-user { color: var(--log-user); font-weight: 600; }
+.toast-body .log-song { color: var(--log-song); font-weight: 600; }
+.toast-body .log-artist { color: var(--log-artist); }
+
+@media (max-width: 1100px) {
+  .shell { grid-template-columns: minmax(300px, 340px) minmax(0, 1fr); gap: 28px; padding: 20px 24px 12px; }
+  .log-dock { padding: 0 24px 12px; }
+  .log-panel { left: 24px; right: 24px; }
+}
+@media (max-width: 920px) {
+  .shell { grid-template-columns: 1fr; grid-auto-rows: auto; align-content: start; padding: 16px; gap: 24px; }
+  .col-player { min-height: auto; }
+  .stage { margin: 0; }
+  .cover-stage.album { --cover-size: 200px; }
+  .lists-card { min-height: 360px; }
+  .log-dock { padding: 0 16px 10px; }
+  .log-panel { left: 16px; right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast, .log-panel, .status-pop, .log-strip-chev, .q-actions, .q-time,
+  .stage .cover-stage.album .cover { transition: none; }
+}
+/* 舰长等身份标签：字色往正文色靠一点，叠在光晕上仍 ≥ 4.5:1。 */
+.tag.tag-priority { color: color-mix(in srgb, var(--log-song) 80%, var(--text)); }
+/* 空闲（没有封面色）时光晕只留很淡的一层中性色；进度条/音量条轨道用正文色的浅混色，叠在光晕上也看得见。 */
+.cover-glow:not(.has-color):not(.is-playing):not(.is-paused) { opacity: 0.28; }
+.stage .bar, .stage #now-progress.bar { background: color-mix(in srgb, var(--text) 12%, transparent); }
+.volume-ctl input[type="range"]::-webkit-slider-runnable-track { background: color-mix(in srgb, var(--text) 14%, transparent); }
+.volume-ctl input[type="range"]::-moz-range-track { background: color-mix(in srgb, var(--text) 14%, transparent); }
+/* 关着的设置抽屉多推出去一点，阴影不再在页面右边缘露出一条灰边。 */
+.settings-drawer:not(.is-open) { transform: translateX(calc(100% + 48px)); }

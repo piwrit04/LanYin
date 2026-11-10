@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 os.environ["OBS_SONG_SKIP_DANMAKU"] = "1"
 
@@ -54,3 +55,30 @@ def test_console_dedupes_log_broadcasts():
     js = (Path(__file__).resolve().parents[1] / "app/static/js/console.js").read_text(encoding="utf-8")
     assert "function hasLogEntry" in js
     assert "if (!hasLogEntry(state.logs, msg.payload))" in js
+
+
+def test_console_v36_quiet_player_structure():
+    """v36：大方形封面替代黑胶、整页光晕、单一状态点、底部日志条、播放失败提示、去掉「默认歌单」标签。"""
+    root = Path(__file__).resolve().parents[1] / "app/static"
+    html = (root / "console.html").read_text(encoding="utf-8")
+    js = (root / "js/console.js").read_text(encoding="utf-8")
+    css = (root / "css/console.css").read_text(encoding="utf-8")
+    assert "console.css?v=37" in html and "console.js?v=37" in html
+    assert "vinyl" not in html and 'class="cover-stage album"' in html and 'id="cover"' in html
+    # 旧状态 pill 的 id 仍在（JS 依赖），但收进了一个状态浮层
+    for pid in ("pill-danmaku", "pill-login", "pill-player", "pill-room"):
+        assert f'id="{pid}"' in html
+    assert 'id="status-summary"' in html and 'id="status-pop"' in html
+    # 光晕是整页固定的一层，不在播放区卡片里，不用 filter/backdrop-filter
+    assert html.index('id="cover-glow"') < html.index('class="app"')
+    assert "backdrop-filter:" not in css
+    assert "position: fixed;\n  inset: -40px;" in css
+    # 日志：底部一条 + 可展开面板，#logs 保留
+    assert 'id="log-strip"' in html and 'id="log-panel"' in html and 'id="logs"' in html
+    assert "function setLogOpen" in js and "function renderLogStrip" in js
+    # 播放失败提示：自动消失、最多 3 条
+    assert "function showToast" in js and "const TOAST_MAX = 2" in js and 'id="toasts"' in html
+    # 列表不再出现「默认歌单」标签
+    assert "tag-idle\">默认歌单" not in js
+    # 空状态示例是「例如」后的示例文字
+    assert "例如" in html and "例如" in js
