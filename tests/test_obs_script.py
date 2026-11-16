@@ -66,7 +66,7 @@ def test_properties_have_no_auto_add_and_have_buttons(proj):
     names = [n for _, n in items]
     assert "auto_sources" not in names
     assert {"btn_start", "btn_popout", "btn_sources", "btn_stop"} <= set(names)
-    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=43"
+    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=44"
 
 
 def test_load_starts_server_no_sources_and_exit_stops_it(proj):
@@ -272,6 +272,25 @@ def test_auto_popup_only_once_on_load_and_finished(proj):
         obs.g.on_popout_clicked(None, None)
         pops2 = [s for s in obs.spawned if "open_console_window.py" in s.get("cmd", "")]
         assert len(pops2) == 2
+    finally:
+        obs.cleanup()
+
+
+def test_auto_popup_again_after_stop_and_start(proj):
+    """停止后再启动时，应重新自动弹出控制台（不能因为本轮已经弹过一次就跳过）。"""
+    root, port = proj
+    obs = FakeObs(root)
+    try:
+        obs.g.script_load(obs.settings(auto_popup=True))
+        assert obs.wait_ready(), obs.logs
+        first = [s for s in obs.spawned if "open_console_window.py" in s.get("cmd", "")]
+        assert len(first) == 1, first
+        obs.g.stop_server()
+        assert _wait_free(port)
+        obs.g.start_server()
+        assert obs.wait_ready(), obs.logs
+        again = [s for s in obs.spawned if "open_console_window.py" in s.get("cmd", "")]
+        assert len(again) == 2, again
     finally:
         obs.cleanup()
 

@@ -63,8 +63,8 @@ def test_console_v36_quiet_player_structure():
     html = (root / "console.html").read_text(encoding="utf-8")
     js = (root / "js/console.js").read_text(encoding="utf-8")
     css = (root / "css/console.css").read_text(encoding="utf-8")
-    assert "console.css?v=43" in html and "console.js?v=43" in html
-    assert "brand-meta" in html and "1.0.0" in html
+    assert "console.css?v=44" in html and "console.js?v=44" in html
+    assert "brand-meta" in html and "1.0.1" in html
     assert "about-foot" in html and "杨雅诗" in html and "小糕栗" in html
     assert "vinyl" not in html and 'class="cover-stage album"' in html and 'id="cover"' in html
     # 旧状态 pill 的 id 仍在（JS 依赖），但收进了一个状态浮层

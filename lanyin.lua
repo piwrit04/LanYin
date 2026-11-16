@@ -4,7 +4,7 @@ SOURCE_OVERLAY = "澜音覆盖层"
 SOURCE_AUDIO = "澜音音频"
 OLD_SOURCE_OVERLAY = "点歌姬覆盖层"
 OLD_SOURCE_AUDIO = "点歌姬音频"
-CONSOLE_VERSION = "43"
+CONSOLE_VERSION = "44"
 DEFAULT_PORT = 8765
 
 auto_start = true
@@ -560,6 +560,7 @@ function stop_server()
   end
   launching_pid = nil
   owned_pending = false
+  console_popup_queued = false
   -- also clear ready flags if still present
   local ready = path_join(project_root(), "data\\server.ready")
   os.remove(ready)

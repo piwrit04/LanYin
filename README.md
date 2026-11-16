@@ -4,12 +4,12 @@
 
 # 澜音 LanYin
 
-面向 B 站直播的 OBS 点歌工具
+开源免费，一键启动的 B 站点歌姬
 
 观众发弹幕「点歌 歌名」，歌曲进入队列，覆盖层同步展示；<br>
 主播用独立控制台管理播放、歌单和设置。不需要会写代码。
 
-[![版本](https://img.shields.io/badge/版本-1.0.0-c45c6a?style=flat-square)](https://github.com/piwrit04/LanYin)
+[![版本](https://img.shields.io/badge/版本-1.0.1-c45c6a?style=flat-square)](https://github.com/piwrit04/LanYin/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![OBS](https://img.shields.io/badge/OBS-脚本版-302E31?style=flat-square)](https://obsproject.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-piwrit04%2FLanYin-181717?style=flat-square&logo=github)](https://github.com/piwrit04/LanYin)
@@ -19,8 +19,6 @@
 </div>
 
 ![澜音控制台](docs/readme/console.png)
-
-短版介绍片见 [`docs/readme/promo-short.mp4`](docs/readme/promo-short.mp4)。
 
 本程序**不会**破解会员、不会解密加密音频，也不会走第三方「付费歌换源」接口。登录和 Cookie 只保存在你自己的电脑上。
 
@@ -79,12 +77,16 @@
 
 ### 1. 下载澜音
 
-1. 打开仓库：[https://github.com/piwrit04/LanYin](https://github.com/piwrit04/LanYin)
-2. 点击绿色的 **Code** → **Download ZIP**，或从 [Releases](https://github.com/piwrit04/LanYin/releases) 下载发布包
-3. 解压到一个固定位置，例如 `D:\Code\Projects\LanYin`  
-   以后更新也请解压到同一文件夹，**不要覆盖**里面的 `config.yaml` 和 `data` 文件夹
+推荐从发布页下载当前版本（现在是 **1.0.1**）：
 
-> 仓库名是 `LanYin`。如果你是从旧目录升级的，本机文件夹也可能仍叫 `obs-song-request`，不影响使用。
+1. 打开 [澜音发布页](https://github.com/piwrit04/LanYin/releases/latest)
+2. 在页面上方找到 **LanYin-1.0.1.zip**（或「Source code (zip) / 源代码 (zip)」），点进去下载
+3. 解压到一个固定位置，例如 `D:\LanYin` 或 `D:\Code\Projects\LanYin`
+4. 以后更新时，把新文件复制到同一个文件夹，**不要覆盖**里面的 `config.yaml` 和 `data` 文件夹（你的设置和登录信息在这里）
+
+也可以打开 [仓库主页](https://github.com/piwrit04/LanYin)，点绿色的 **Code** → **Download ZIP**，这会下载主分支上的最新代码。
+
+> 仓库名是 `LanYin`。如果你是从旧目录升级的，本机文件夹也可能仍叫 `obs-song-request` 或 `LanYin-main`，不影响使用。
 
 ### 2. 安装 Python
 
@@ -106,7 +108,7 @@ Linux 用户一般用系统自带的 Python 3 即可，然后用下面的 `start
 4. 选中本目录里的 `lanyin.lua`（只需添加这一次）
 5. 如果以前加过 `obs_song_request.lua`，先把那条缺失的脚本去掉，再添加 `lanyin.lua`
 
-之后每次打开 OBS，澜音就会在后台运行。在「工具 → 脚本」里选中澜音脚本，点 **弹出独立控制台窗口**。窗口如果已经开着，会回到原来的窗口，不会再开第二个。
+之后每次打开 OBS，澜音就会在后台运行，并自动弹出控制台窗口（可在脚本设置里取消「启动后自动弹出独立控制台窗口」）。如果窗口没出现，到「工具 → 脚本」里选中澜音脚本，点 **弹出独立控制台窗口**。窗口如果已经开着，会回到原来的窗口，不会再开第二个。停止后再启动，控制台也会重新弹出。
 
 **临时不用 OBS 时：** 也可以双击 `start.bat`。如果 OBS 里的澜音已经在跑，会复用同一个后台，不会再启动一份；关闭 OBS 时，也只会停掉 OBS 自己拉起的那个。
 
@@ -299,6 +301,9 @@ Content-Type: application/json
 **很多歌都跳到哔哩哔哩了**  
 通常是因为前面的音乐平台对这首歌只提供试听，或需要会员。这是预期行为，不是故障。
 
+**停止澜音后再启动，控制台窗口没有出来**  
+请使用 1.0.1 或更新版本。在「工具 → 脚本」里选中澜音，点 **弹出独立控制台窗口**。从 1.0.1 起，停止后再启动会重新自动弹出。
+
 **脚本重新加载之后，设置好像没保存成功**  
 请使用当前版本的脚本。重新加载时应先关掉 OBS 启动的旧后台，再拉起新的。若仍提示超时，先点「停止澜音」，等一两秒再点「立即启动澜音」。
 
@@ -323,8 +328,8 @@ python -m app
 
 ## 版本与后续
 
-- 当前发布版：**1.0.0**（控制台构建 43）
-- 短宣传样片：[`docs/readme/promo-short.mp4`](docs/readme/promo-short.mp4)
+- 当前发布版：**1.0.1**（控制台构建 44）
+- 下载地址：[github.com/piwrit04/LanYin/releases/latest](https://github.com/piwrit04/LanYin/releases/latest)
 - 推荐用法是 OBS **脚本版**（`lanyin.lua`）
 - 原生停靠插件会另作发布，不包含在本目录的日常使用流程里
 
