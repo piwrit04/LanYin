@@ -20,6 +20,8 @@
 
 ![澜音控制台](docs/readme/console.png)
 
+介绍片见 [docs/readme/promo.mp4](docs/readme/promo.mp4)。
+
 本程序**不会**破解会员、不会解密加密音频，也不会走第三方「付费歌换源」接口。登录和 Cookie 只保存在你自己的电脑上。
 
 ---
