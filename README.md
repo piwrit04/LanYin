@@ -9,12 +9,12 @@
 观众发弹幕「点歌 歌名」，歌曲进入队列，覆盖层同步展示；<br>
 主播用独立控制台管理播放、歌单和设置。不需要会写代码。
 
-[![版本](https://img.shields.io/badge/版本-1.0.1-c45c6a?style=flat-square)](https://github.com/piwrit04/LanYin/releases/latest)
+[![版本](https://img.shields.io/badge/版本-1.0.2-c45c6a?style=flat-square)](https://github.com/piwrit04/LanYin/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![OBS](https://img.shields.io/badge/OBS-脚本版-302E31?style=flat-square)](https://obsproject.com/)
 [![GitHub](https://img.shields.io/badge/GitHub-piwrit04%2FLanYin-181717?style=flat-square&logo=github)](https://github.com/piwrit04/LanYin)
 
-**作者**　杨雅诗（小糕栗）　·　**仓库**　[github.com/piwrit04/LanYin](https://github.com/piwrit04/LanYin)
+**作者**　星澪　·　**仓库**　[github.com/piwrit04/LanYin](https://github.com/piwrit04/LanYin)
 
 </div>
 
@@ -77,10 +77,10 @@
 
 ### 1. 下载澜音
 
-推荐从发布页下载当前版本（现在是 **1.0.1**）：
+推荐从发布页下载当前版本（现在是 **1.0.2**）：
 
 1. 打开 [澜音发布页](https://github.com/piwrit04/LanYin/releases/latest)
-2. 在页面上方找到 **LanYin-1.0.1.zip**（或「Source code (zip) / 源代码 (zip)」），点进去下载
+2. 在页面上方找到 **LanYin-1.0.2.zip**（或「Source code (zip) / 源代码 (zip)」），点进去下载
 3. 解压到一个固定位置，例如 `D:\LanYin` 或 `D:\Code\Projects\LanYin`
 4. 以后更新时，把新文件复制到同一个文件夹，**不要覆盖**里面的 `config.yaml` 和 `data` 文件夹（你的设置和登录信息在这里）
 
@@ -328,7 +328,7 @@ python -m app
 
 ## 版本与后续
 
-- 当前发布版：**1.0.1**（控制台构建 44）
+- 当前发布版：**1.0.2**（控制台构建 45）
 - 下载地址：[github.com/piwrit04/LanYin/releases/latest](https://github.com/piwrit04/LanYin/releases/latest)
 - 推荐用法是 OBS **脚本版**（`lanyin.lua`）
 - 原生停靠插件会另作发布，不包含在本目录的日常使用流程里
@@ -337,7 +337,7 @@ python -m app
 
 ## 作者
 
-**杨雅诗（小糕栗）**
+**星澪**
 
 - GitHub：[@piwrit04](https://github.com/piwrit04)
 - 项目仓库：[LanYin](https://github.com/piwrit04/LanYin)

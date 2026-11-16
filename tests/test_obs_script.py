@@ -66,7 +66,7 @@ def test_properties_have_no_auto_add_and_have_buttons(proj):
     names = [n for _, n in items]
     assert "auto_sources" not in names
     assert {"btn_start", "btn_popout", "btn_sources", "btn_stop"} <= set(names)
-    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=44"
+    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=45"
 
 
 def test_load_starts_server_no_sources_and_exit_stops_it(proj):
