@@ -66,7 +66,7 @@ def test_properties_have_no_auto_add_and_have_buttons(proj):
     names = [n for _, n in items]
     assert "auto_sources" not in names
     assert {"btn_start", "btn_popout", "btn_sources", "btn_stop"} <= set(names)
-    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=38"
+    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=43"
 
 
 def test_load_starts_server_no_sources_and_exit_stops_it(proj):
@@ -98,6 +98,54 @@ def test_load_starts_server_no_sources_and_exit_stops_it(proj):
         assert not (root / "data/obs-owned.pid").exists()
         obs.g.script_unload()
         assert obs.fake.timer_count() == 0 and obs.fake.cb_count() == 0
+    finally:
+        obs.cleanup()
+
+
+def test_script_reload_restarts_owned_server(proj):
+    """重新加载脚本时应停掉 OBS 启动的旧进程，再拉起新进程。"""
+    root, port = proj
+    obs = FakeObs(root)
+    try:
+        obs.g.script_load(obs.settings(auto_popup=False))
+        assert obs.wait_ready(), obs.logs
+        pid1 = int((root / "data/server.pid").read_text())
+        n = len(obs.spawned)
+        obs.g.script_unload()
+        assert _wait_free(port), obs.logs
+        assert not obs._alive(pid1)
+        obs.g.script_load(obs.settings(auto_popup=False))
+        assert obs.wait_ready(), obs.logs
+        pid2 = int((root / "data/server.pid").read_text())
+        assert pid2 != pid1
+        assert len(obs.spawned) == n + 1
+        assert _health(port)["app"] == "lanyin"
+    finally:
+        obs.cleanup()
+
+
+def test_server_ready_force_refreshes_player_url(proj):
+    """后台就绪后强制给音频页加 boot，避免 CEF 还停在旧页面上不出声。"""
+    root, port = proj
+    obs = FakeObs(root)
+    lua_src = obs.lua.eval(
+        "function(n, u) local d = obslua.obs_data_create(); obslua.obs_data_set_string(d, 'url', u); "
+        "obslua.obs_data_set_bool(d, 'shutdown', true); "
+        "return obslua.obs_source_create('browser_source', n, d, nil) end"
+    )
+    lua_src("澜音音频", f"http://127.0.0.1:{port}/player")
+    lua_src("澜音覆盖层", f"http://127.0.0.1:{port}/overlay")
+    try:
+        obs.g.script_load(obs.settings(auto_popup=False))
+        assert obs.wait_ready(), obs.logs
+        pid = int((root / "data/server.pid").read_text())
+        au = obs.fake.sources["澜音音频"]["settings"]["_v"]
+        ov = obs.fake.sources["澜音覆盖层"]["settings"]["_v"]
+        assert au["url"] == f"http://127.0.0.1:{port}/player?boot={pid}"
+        assert ov["url"] == f"http://127.0.0.1:{port}/overlay?boot={pid}"
+        assert au["shutdown"] is False
+        assert au["reroute_audio"] is True
+        assert any("已刷新覆盖层和音频页" in m for m in obs.logs), obs.logs
     finally:
         obs.cleanup()
 
@@ -226,3 +274,17 @@ def test_auto_popup_only_once_on_load_and_finished(proj):
         assert len(pops2) == 2
     finally:
         obs.cleanup()
+
+
+def test_script_description_covers_current_behavior():
+    lua = (REPO / "lanyin.lua").read_text(encoding="utf-8")
+    start = lua.index("function script_description()")
+    end = lua.index("\nend", start)
+    desc = lua[start:end]
+    assert "监听并输出" in desc
+    assert "不会自动播放" in desc
+    assert "不打开第二个窗口" in desc
+    assert "后台启动" in desc or "后台启动澜音" in desc
+    assert "点歌姬覆盖层" not in desc
+    assert "点歌姬音频" not in desc
+    assert "点歌姬控制台" not in desc

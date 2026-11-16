@@ -18,7 +18,7 @@ from app.portcfg import base_url, http_get, window_url  # noqa: E402  (stdlib on
 
 DATA = ROOT / "data"
 PROFILE = DATA / "console-window-profile"
-# 端口跟 config.yaml 走（默认 8765），版本号跟 console.html 的 ?v=38 一致
+# 端口跟 config.yaml 走（默认 8765），版本号跟 console.html 的 ?v= 与 CONSOLE_VERSION 保持一致
 URL = window_url()
 TITLE = "澜音控制台"
 WIDTH, HEIGHT = 1320, 900

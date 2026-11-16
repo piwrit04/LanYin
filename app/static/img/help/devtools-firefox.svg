@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" width="640" height="300" role="img" aria-labelledby="t d">
+  <title id="t">Firefox 网络面板示意图</title>
+  <desc id="d">在开发者工具中打开「网络」，选中一条发往音乐网站的请求，到右侧「标头」的「请求头」里复制 Cookie。图中数值已打码。</desc>
+  <defs>
+    <clipPath id="win"><rect x="0" y="0" width="640" height="300" rx="12"/></clipPath>
+  </defs>
+  <g clip-path="url(#win)">
+    <rect width="640" height="300" fill="#1c1e22"/>
+    <rect width="640" height="36" fill="#14161a"/>
+    <text x="16" y="23" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">检查器</text>
+    <text x="64" y="23" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">控制台</text>
+    <text x="116" y="23" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">调试器</text>
+    <rect x="168" y="8" width="52" height="20" rx="4" fill="#2a4a6e"/>
+    <text x="177" y="23" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8ec8ff">网络</text>
+    <text x="230" y="23" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">存储</text>
+    <line x1="168" y1="35" x2="220" y2="35" stroke="#5aa2e8" stroke-width="2"/>
+    <rect x="0" y="36" width="640" height="28" fill="#191b1f"/>
+    <text x="16" y="54" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="11" fill="#6d737c">筛选请求</text>
+    <rect x="0" y="64" width="250" height="236" fill="#16181c"/>
+    <text x="16" y="84" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="11" fill="#6d737c">状态</text>
+    <text x="64" y="84" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="11" fill="#6d737c">文件名</text>
+    <text x="16" y="108" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#a8adb6">200</text>
+    <text x="64" y="108" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#a8adb6">y.qq.com</text>
+    <rect x="8" y="116" width="234" height="22" rx="3" fill="#1e3a5f"/>
+    <text x="16" y="132" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#9ad0ff">200</text>
+    <text x="64" y="132" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#e8eaed">cgi-bin/musicu.fcg</text>
+    <text x="16" y="156" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#8b9098">200</text>
+    <text x="64" y="156" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#8b9098">logo.svg</text>
+    <text x="16" y="178" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#8b9098">204</text>
+    <text x="64" y="178" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#8b9098">beacon</text>
+    <line x1="250" y1="64" x2="250" y2="300" stroke="#2c3036"/>
+    <rect x="250" y="64" width="390" height="236" fill="#1c1e22"/>
+    <text x="266" y="86" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#e8eaed">标头</text>
+    <text x="308" y="86" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">响应</text>
+    <text x="348" y="86" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="12" fill="#8b9098">Cookie</text>
+    <line x1="266" y1="90" x2="290" y2="90" stroke="#5aa2e8" stroke-width="2"/>
+    <text x="266" y="116" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="11" fill="#9aa0a8">请求头</text>
+    <text x="266" y="136" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="11" fill="#8b9098">Host  y.qq.com</text>
+    <rect x="260" y="148" width="270" height="48" rx="4" fill="#2a2416" stroke="#c9a227" stroke-width="1.2"/>
+    <text x="270" y="166" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#f3d26a">Cookie</text>
+    <text x="270" y="184" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="12" fill="#e8eaed">uin=o0…; qm_keyst=…</text>
+    <text x="266" y="218" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="11" fill="#8b9098">Accept  */*</text>
+    <text x="266" y="236" font-family="Segoe UI, Consolas, Microsoft YaHei, monospace" font-size="11" fill="#8b9098">Referer  https://y.qq.com/</text>
+    <path d="M538 172 H556" stroke="#f3d26a" stroke-width="1.4"/>
+    <polygon points="538,172 545,168 545,176" fill="#f3d26a"/>
+    <rect x="556" y="158" width="68" height="28" rx="4" fill="#f3d26a"/>
+    <text x="566" y="176" font-family="Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif" font-size="11" fill="#1c1e22">复制这里</text>
+  </g>
+  <rect x="0.5" y="0.5" width="639" height="299" rx="12" fill="none" stroke="#3a3e46"/>
+</svg>

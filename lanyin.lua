@@ -4,7 +4,7 @@ SOURCE_OVERLAY = "澜音覆盖层"
 SOURCE_AUDIO = "澜音音频"
 OLD_SOURCE_OVERLAY = "点歌姬覆盖层"
 OLD_SOURCE_AUDIO = "点歌姬音频"
-CONSOLE_VERSION = "38"
+CONSOLE_VERSION = "43"
 DEFAULT_PORT = 8765
 
 auto_start = true
@@ -75,9 +75,9 @@ try_load_ffi()
 function script_description()
   return [[<h2>澜音</h2>
 <p>打开 OBS 后会在后台启动澜音，不用再点 start.bat，也不用再开浏览器。</p>
-<p>控制台请点下面的「弹出独立控制台窗口」，会打开一个单独的大窗口，不用挤在 OBS 边缘。</p>
-<p>原来那个叫「点歌姬控制台」的停靠窗口如果还在，可以在 <b>视图 → 停靠窗口</b> 里取消勾选。关掉 OBS 后重新运行 bind_to_obs.bat，标题会改成「澜音控制台」。</p>
-<p>覆盖层和音频<b>不会</b>自动加到场景里。需要时点下面的「把覆盖层和音频加到当前场景」。如果场景里已有旧的「点歌姬覆盖层」「点歌姬音频」，加载时会自动改名为「澜音覆盖层」「澜音音频」。</p>]]
+<p>控制台请点「弹出独立控制台窗口」。如果窗口已经打开，会回到已有窗口，不打开第二个窗口。</p>
+<p>打开控制台不会自动播放，会恢复上次的歌曲和进度并保持暂停。直播间里新点的歌仍会立刻播放。</p>
+<p>覆盖层和音频<b>不会</b>自动加到场景里。需要时点「把覆盖层和音频加到当前场景」。场景里有「澜音音频」后，脚本会把它设为「监听并输出」，你不用另开播放页面或手动开监听，就能听到和观众一样的音量。这个音频源可以放在画布外面，不必隐藏。</p>]]
 end
 
 -- 端口跟 config.yaml 走（默认 8765）。用户按 README 改了端口，覆盖层/音频地址也跟着变。
@@ -160,7 +160,11 @@ function script_unload()
   loaded = false
   console_popup_queued = false
   obs.timer_remove(poll_ready)
+  obs.timer_remove(poll_start_after_stop)
   obs.obs_frontend_remove_event_callback(on_frontend_event)
+  -- 重新加载脚本时必须停掉 OBS 启动的旧后台，否则控制台已是新代码、后台还是旧进程。
+  -- 用 start.bat 开的本地版不会被停。
+  stop_owned_server()
 end
 
 function on_frontend_event(event)
@@ -396,10 +400,32 @@ function open_console_window()
   start_hidden(exe, '"' .. script .. '"', root)
 end
 
+stale_wait = 0
+
+function poll_start_after_stop()
+  obs.timer_remove(poll_start_after_stop)
+  start_server()
+end
+
 function start_server()
+  -- 重新加载后，就绪标志已清但旧进程可能还占着端口，先等它退出再启动。
+  local ready = path_join(project_root(), "data\\server.ready")
+  local stale = read_pid_file("server.pid")
+  if stale and process_is_running(stale) and not file_exists(ready) then
+    stale_wait = (stale_wait or 0) + 1
+    if stale_wait <= 15 then
+      file_log("正在等待旧进程退出后再启动")
+      obs.timer_remove(poll_start_after_stop)
+      obs.timer_add(poll_start_after_stop, 300)
+      return
+    end
+    file_log("旧进程仍未退出，尝试继续启动")
+  end
+  stale_wait = 0
   if server_is_up() then
     file_log("澜音已经在运行（" .. base_url() .. "）")
-    refresh_browser_sources()
+    -- 后台在、音频页却掉线时（比如刚关过控制台），强制重载一次浏览器源。
+    refresh_browser_sources(false)
     maybe_auto_popup()
     return
   end
@@ -506,7 +532,7 @@ function poll_ready()
       mark_owned()
       owned_pending = false
     end
-    refresh_browser_sources()
+    refresh_browser_sources(false)
     maybe_auto_popup()
     obs.timer_remove(poll_ready)
     return
@@ -653,26 +679,67 @@ function apply_audio_monitor(src)
   end
 end
 
-function refresh_browser_sources()
+function strip_url_query(u)
+  if not u then
+    return ""
+  end
+  return string.match(u, "^([^%?]+)") or u
+end
+
+function browser_boot_token()
+  return tostring(read_pid_file("server.pid") or os.time())
+end
+
+function with_boot(url, boot)
+  local base = strip_url_query(url)
+  if boot and boot ~= "" then
+    return base .. "?boot=" .. tostring(boot)
+  end
+  return base
+end
+
+-- soft=true：只在端口/路径变化时更新，避免正常播放中被打断。
+-- soft=false：后台刚起来时强制重载，让「澜音音频」重新连上 WebSocket。
+function refresh_browser_sources(soft)
   migrate_legacy_sources()
+  if soft == nil then
+    soft = true
+  end
+  local boot = nil
+  if not soft then
+    boot = browser_boot_token()
+  end
   local names = {SOURCE_OVERLAY, SOURCE_AUDIO}
   for i = 1, #names do
     local src = obs.obs_get_source_by_name(names[i])
     if src ~= nil then
       local settings = obs.obs_source_get_settings(src)
-      local url = obs.obs_data_get_string(settings, "url")
-      -- 改过端口后，把旧的 127.0.0.1:端口 地址换成当前端口。
-      -- URL 没变时不要 obs_source_update，否则浏览器源会重载、声音中断。
+      local url = obs.obs_data_get_string(settings, "url") or ""
       local want = (names[i] == SOURCE_OVERLAY) and overlay_url() or player_url()
-      local path = string.match(url or "", "^http://127%.0%.0%.1:%d+(/.*)$") or string.match(url or "", "^http://localhost:%d+(/.*)$")
+      local path = string.match(url, "^http://127%.0%.0%.1:%d+(/.*)$") or string.match(url, "^http://localhost:%d+(/.*)$")
       local new_url = url
       if path then
-        local base_path = string.match(want, "^http://[^/]+(/[^?]*)")
-        if string.sub(path, 1, #base_path) == base_path then
-          new_url = base_url() .. path
+        local path_no_q = strip_url_query(path)
+        local base_path = string.match(want, "^http://[^/]+(/[^%?]*)")
+        if base_path and string.sub(path_no_q, 1, #base_path) == base_path then
+          -- 保留原来的查询参数（例如 overlay?mode=bar），soft 时不改 boot。
+          local q = string.match(path, "(%?.*)$")
+          new_url = base_url() .. path_no_q .. (q or "")
         end
       end
-      if new_url ~= url then
+      if not soft then
+        new_url = with_boot(strip_url_query(new_url ~= "" and new_url or want), boot)
+      elseif new_url == "" then
+        new_url = want
+      end
+      local changed = new_url ~= url
+      if (not soft) and names[i] == SOURCE_AUDIO then
+        -- 旧来源可能勾了「不可见时关闭」，会导致关掉控制台后没声音。
+        obs.obs_data_set_bool(settings, "shutdown", false)
+        obs.obs_data_set_bool(settings, "reroute_audio", true)
+        changed = true
+      end
+      if changed then
         obs.obs_data_set_string(settings, "url", new_url)
         obs.obs_source_update(src, settings)
       end
@@ -682,5 +749,8 @@ function refresh_browser_sources()
       obs.obs_data_release(settings)
       obs.obs_source_release(src)
     end
+  end
+  if not soft then
+    file_log("已刷新覆盖层和音频页，重新接通播放")
   end
 end

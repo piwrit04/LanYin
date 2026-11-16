@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音控制台</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=38" />
-  <link rel="stylesheet" href="/static/css/console.css?v=38" />
+  <link rel="stylesheet" href="/static/css/common.css?v=43" />
+  <link rel="stylesheet" href="/static/css/console.css?v=43" />
 </head>
 <body data-theme="plain">
   <div class="atmosphere" aria-hidden="true"></div>
@@ -16,7 +16,10 @@
     <header class="topbar">
       <div class="brand">
         <img class="mark" src="/static/img/lanyin-mark.svg" alt="" width="28" height="28" />
-        <h1>澜音</h1>
+        <div class="brand-text">
+          <h1>澜音</h1>
+          <p class="brand-meta">1.0.0</p>
+        </div>
       </div>
       <div class="search-song">
         <label class="search-field">
@@ -148,8 +151,6 @@
             </div>
           </div>
           <div id="selection" class="selection-overlay"></div>
-          <!-- 播放失败提示：列表顶部居中，最多 2 条，约 4.5 秒后自动消失；不挡最后几行、时长和播放控制。 -->
-          <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
         </div>
       </section>
     </div>
@@ -383,7 +384,7 @@
     <div class="tab-pane" data-pane="login">
       <p class="hint">登录信息只保存在这台电脑的 <code>data/secrets.json</code>，不会上传。登录 B 站后才能自动发选歌提醒和进房欢迎弹幕；不登录仍然可以听弹幕点歌，并在覆盖层/本页完成选歌。</p>
       <div class="controls plat-links">
-        <a class="btn-link" href="https://live.bilibili.com/1506613" target="_blank" rel="noopener">打开我的 B 站直播间</a>
+        <a class="btn-link is-disabled" id="bili-room-link" aria-disabled="true">打开我的 B 站直播间</a>
         <a class="btn-link" href="https://y.qq.com/" target="_blank" rel="noopener">打开 QQ 音乐</a>
         <a class="btn-link" href="https://music.163.com/" target="_blank" rel="noopener">打开网易云音乐</a>
         <a class="btn-link" href="https://www.kugou.com/" target="_blank" rel="noopener">打开酷狗音乐</a>
@@ -399,7 +400,40 @@
       </div>
       <details class="login-help">
         <summary>如何复制 QQ / 网易云 / 酷狗 Cookie</summary>
-        <p class="hint">请先点上面按钮打开网页并登录。然后按键盘 F12，点顶部「应用程序」（英文是 Application，没有就点 >>），左侧选 Cookies，再点对应网站，把需要的值复制到下面：QQ 复制 <code>uin</code> 和 <code>qm_keyst</code>；网易云复制 <code>MUSIC_U</code>；酷狗复制 <code>KuGoo</code> 或 <code>t</code>。B 站请直接用扫码，不用复制 Cookie。可选粘贴其它平台网页 Cookie，提高免费可播曲的成功率（不会用来解锁会员歌）。</p>
+        <p class="hint">请先点上面按钮打开对应网页并登录。可选粘贴网页 Cookie，只提高免费可播曲的成功率，不会用来解锁会员歌。B 站请直接用扫码，不用复制 Cookie。</p>
+        <p class="hint">要复制的值：QQ 复制 <code>uin</code> 和 <code>qm_keyst</code>；网易云复制 <code>MUSIC_U</code>；酷狗复制 <code>KuGoo</code> 或 <code>t</code>。</p>
+        <div class="help-browser">
+          <div class="segmented help-browser-switch" role="tablist" aria-label="选择浏览器">
+            <label><input type="radio" name="help-browser" value="chromium" checked /> Edge / Chrome</label>
+            <label><input type="radio" name="help-browser" value="firefox" /> Firefox</label>
+          </div>
+          <div class="help-panel help-chromium">
+            <ol class="login-help-steps">
+              <li>按 <kbd>F12</kbd>，或在页面上右键点「检查」。</li>
+              <li>打开顶部的「网络」（英文是 Network）。如果看不到，点 <kbd>&gt;&gt;</kbd>。</li>
+              <li>按 <kbd>F5</kbd> 刷新页面。</li>
+              <li>在列表里点一条发往这个音乐网站自己的请求（不要点广告或统计请求）。</li>
+              <li>右侧打开「标头」（英文是 Headers），在「请求标头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
+            </ol>
+            <figure class="help-diagram">
+              <img src="/static/img/help/devtools-chromium.svg?v=43" alt="Edge / Chrome 开发者工具示意图：在网络面板选中一条请求，到请求标头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
+            </figure>
+          </div>
+          <div class="help-panel help-firefox">
+            <ol class="login-help-steps">
+              <li>按 <kbd>F12</kbd>，或在页面上右键点「检查元素」。</li>
+              <li>打开「网络」面板。如果顶部看不到，点面板右上角的工具菜单再选「网络」。</li>
+              <li>按 <kbd>F5</kbd> 刷新页面。</li>
+              <li>在列表里点一条发往这个音乐网站自己的请求。</li>
+              <li>右侧打开「标头」，在「请求头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
+            </ol>
+            <figure class="help-diagram">
+              <img src="/static/img/help/devtools-firefox.svg?v=43" alt="Firefox 开发者工具示意图：在网络面板选中一条请求，到请求头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
+            </figure>
+          </div>
+        </div>
       </details>
       <div class="row cookie-row">
         <select id="cookie-platform">
@@ -415,10 +449,17 @@
     </div>
 
     </div>
+    <footer class="about-foot">
+      <p>澜音 1.0.0</p>
+      <p>作者 杨雅诗（小糕栗）</p>
+      <p><a href="https://github.com/piwrit04/LanYin" target="_blank" rel="noopener noreferrer">GitHub</a></p>
+    </footer>
   </aside>
 
   <audio id="console-audio" preload="auto"></audio>
-  <script src="/static/js/common.js?v=38"></script>
-  <script src="/static/js/console.js?v=38"></script>
+  <!-- 全局提示：固定在窗口顶部居中，设置/登录页也能看到；最多 2 条，约 4.5 秒后自动消失。 -->
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script src="/static/js/common.js?v=43"></script>
+  <script src="/static/js/console.js?v=43"></script>
 </body>
 </html>

@@ -225,7 +225,7 @@ async def ws_endpoint(ws: WebSocket):
                         )
                 await ws.send_json({"type": "state", "payload": state.hub.snapshot(state.public_extra())})
             elif typ == "command":
-                await handle_command(data)
+                await handle_command(data, ws)
             elif typ == "player":
                 await handle_player_event(data)
     except WebSocketDisconnect:
@@ -233,10 +233,32 @@ async def ws_endpoint(ws: WebSocket):
     except Exception:
         pass
     finally:
+        left = state.hub.roles.get(ws)
         await state.hub.unregister(ws)
+        if left in {"player", "console", "console_window"} and not state.hub.player_connected():
+            if state.hub.current and not state.hub.current.paused:
+                state.hub.log("warn", "播放页已断开，直播可能没声音。请点一次「立即启动澜音」刷新音频，或重新打开控制台")
 
 
-async def handle_command(data: dict[str, Any]) -> None:
+async def _reply_ack(ws: WebSocket | None, data: dict[str, Any], ok: bool, error: str | None = None) -> None:
+    request_id = data.get("request_id")
+    if not request_id or ws is None:
+        return
+    msg: dict[str, Any] = {
+        "type": "ack",
+        "action": data.get("action"),
+        "ok": bool(ok),
+        "request_id": request_id,
+    }
+    if error:
+        msg["error"] = str(error)
+    try:
+        await ws.send_json(msg)
+    except Exception:
+        pass
+
+
+async def handle_command(data: dict[str, Any], ws: WebSocket | None = None) -> None:
     action = data.get("action")
     if action == "pause":
         await state.engine.pause()
@@ -289,7 +311,12 @@ async def handle_command(data: dict[str, Any]) -> None:
         if query:
             await state.engine.request_song(0, "主播", query, manual=True)
     elif action == "update_settings":
-        await update_settings(data.get("settings") or {})
+        try:
+            await update_settings(data.get("settings") or {})
+        except Exception as exc:
+            await _reply_ack(ws, data, False, str(exc) or "保存失败")
+        else:
+            await _reply_ack(ws, data, True)
     elif action == "reconnect_danmaku":
         await start_danmaku()
         await state.engine.push_state()
@@ -404,17 +431,47 @@ async def handle_player_event(data: dict[str, Any]) -> None:
         await state.engine.skip()
 
 
-async def update_settings(incoming: dict[str, Any]) -> None:
+def _safe_int(value: Any) -> int | None:
+    """Parse an optional int. Empty / NaN / None do not count as 0."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def apply_and_save_settings(incoming: dict[str, Any]) -> bool:
+    """Write incoming settings to config.yaml and reload.
+
+    Returns True if room_id changed. Does not reconnect danmaku or start
+    playback — those must not block the client ack.
+    """
     cfg = state.config
     old_room = int(cfg["room_id"])
-    if "room_id" in incoming and incoming["room_id"]:
-        cfg["room_id"] = int(incoming["room_id"])
+    if "room_id" in incoming:
+        room = _safe_int(incoming["room_id"])
+        if room is not None and room > 0:
+            cfg["room_id"] = room
     if "selection_timeout_seconds" in incoming:
-        cfg["selection_timeout_seconds"] = max(10, int(incoming["selection_timeout_seconds"]))
+        timeout = _safe_int(incoming["selection_timeout_seconds"])
+        if timeout is not None:
+            cfg["selection_timeout_seconds"] = max(10, timeout)
     if "sources_priority" in incoming and incoming["sources_priority"]:
-        cfg["sources_priority"] = list(incoming["sources_priority"])
+        raw_pri = incoming["sources_priority"]
+        if isinstance(raw_pri, list):
+            cfg["sources_priority"] = list(raw_pri)
     if "anti_spam" in incoming and isinstance(incoming["anti_spam"], dict):
-        cfg["anti_spam"].update(incoming["anti_spam"])
+        for key in ("max_pending_per_user", "max_queue_size", "cooldown_seconds"):
+            if key not in incoming["anti_spam"]:
+                continue
+            parsed = _safe_int(incoming["anti_spam"][key])
+            if parsed is not None:
+                cfg["anti_spam"][key] = parsed
     if "selection" in incoming and isinstance(incoming["selection"], dict):
         cfg.setdefault("selection", {"timeout_action": "skip"})
         action = str(incoming["selection"].get("timeout_action") or "").strip().lower()
@@ -485,12 +542,37 @@ async def update_settings(incoming: dict[str, Any]) -> None:
     save_config(cfg)
     state.config = load_config()
     state.hub.log("info", "已保存设置")
-    if int(state.config["room_id"]) != old_room:
-        state.hub.log("info", f"房间号已改为 {state.config['room_id']}，正在重新连接弹幕")
-        await start_danmaku()
-    # 打开默认歌单且当前空闲时，开始播放
-    await state.engine._maybe_start()
-    await state.engine.push_state()
+    return int(state.config["room_id"]) != old_room
+
+
+def _schedule_settings_side_effects(room_changed: bool) -> None:
+    """Reconnect danmaku / maybe start playback after settings are already saved."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    async def _run() -> None:
+        try:
+            if room_changed:
+                state.hub.log("info", f"房间号已改为 {state.config['room_id']}，正在重新连接弹幕")
+                await start_danmaku()
+            await state.engine._maybe_start()
+            await state.engine.push_state()
+        except Exception as exc:
+            state.hub.log("error", f"设置保存后的后续处理失败：{exc}")
+
+    loop.create_task(_run())
+
+
+async def update_settings(incoming: dict[str, Any]) -> None:
+    # 先落盘并立刻回推状态，ack 不需要等弹幕重连或开始播放。
+    room_changed = apply_and_save_settings(incoming)
+    try:
+        await state.engine.push_state()
+    except Exception:
+        pass
+    _schedule_settings_side_effects(room_changed)
 
 
 @app.post("/api/settings")

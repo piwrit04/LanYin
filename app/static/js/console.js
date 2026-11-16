@@ -157,6 +157,8 @@ function connect() {
       }
     } else if (msg.type === "player_cmd") {
       handlePlayerCmd(msg);
+    } else if (msg.type === "ack") {
+      settleAck(msg);
     }
   };
   ws.onclose = () => setTimeout(connect, 1500);
@@ -179,6 +181,58 @@ function hasLogEntry(logs, entry) {
 
 function send(payload) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(payload));
+}
+
+let ackSeq = 0;
+const pendingAcks = new Map();
+
+function nextAckId() {
+  ackSeq += 1;
+  return "ack-" + Date.now() + "-" + ackSeq;
+}
+
+function settleAck(msg) {
+  const pending = pendingAcks.get(msg && msg.request_id);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingAcks.delete(msg.request_id);
+  if (msg.ok) pending.resolve(msg);
+  else pending.reject(new Error(msg.error || "保存失败"));
+}
+
+let lastSaveTimeoutAt = 0;
+
+function settleSavesFromLog() {
+  const pending = Array.from(pendingAcks.entries());
+  if (pending.length) {
+    pending.forEach(([id, item]) => {
+      clearTimeout(item.timer);
+      pendingAcks.delete(id);
+      item.resolve({ type: "ack", ok: true, request_id: id });
+    });
+    return;
+  }
+  // 旧后台可能先把保存做完，等后续处理结束才把日志发出来；若刚才已经提示超时，改成成功提示。
+  if (Date.now() - lastSaveTimeoutAt < 20000) {
+    lastSaveTimeoutAt = 0;
+    showToast("设置已保存", "房间号和点歌规则已更新", "success");
+  }
+}
+
+function sendAndAck(payload, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== 1) {
+      reject(new Error("未连接到澜音"));
+      return;
+    }
+    const request_id = nextAckId();
+    const timer = setTimeout(() => {
+      pendingAcks.delete(request_id);
+      reject(new Error("保存超时，请稍后重试"));
+    }, timeoutMs || 8000);
+    pendingAcks.set(request_id, { resolve, reject, timer });
+    send(Object.assign({}, payload, { request_id }));
+  });
 }
 
 function fmt(sec) {
@@ -760,8 +814,65 @@ function renderSelection() {
   if (cancel) cancel.onclick = () => send({ type: "command", action: "cancel_selection" });
 }
 
+let sourcesDragging = false;
+let sourcesRenderQueued = false;
+let sourceDragId = null;
+
+function sourcePriorityIds() {
+  const fromSettings = ((state.settings && state.settings.sources_priority) || []).filter(Boolean);
+  if (fromSettings.length) return fromSettings.slice();
+  return (state.sources || []).map((s) => s.id).filter(Boolean);
+}
+
+function applySourceOrder(ids) {
+  if (!state.settings) state.settings = {};
+  state.settings.sources_priority = ids.slice();
+  const byId = new Map((state.sources || []).map((s) => [s.id, s]));
+  const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+  const leftover = (state.sources || []).filter((s) => !ids.includes(s.id));
+  state.sources = ordered.concat(leftover);
+}
+
+function reorderSourceIds(ids, fromId, toId) {
+  const from = ids.indexOf(fromId);
+  const to = ids.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return null;
+  const next = ids.slice();
+  next.splice(to, 0, next.splice(from, 1)[0]);
+  return next;
+}
+
+function sourceTargetId(e, ids) {
+  const li = e.target && e.target.closest ? e.target.closest("#sources li[data-id]") : null;
+  if (li && li.dataset.id) return li.dataset.id;
+  const items = Array.from(document.querySelectorAll("#sources li[data-id]"));
+  if (!items.length) return ids[ids.length - 1] || null;
+  for (const item of items) {
+    const r = item.getBoundingClientRect();
+    if (e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2)) {
+      return item.dataset.id;
+    }
+  }
+  return ids[ids.length - 1] || null;
+}
+
+function commitSourceOrder(fromId, toId) {
+  const next = reorderSourceIds(sourcePriorityIds(), fromId, toId);
+  if (!next) return;
+  applySourceOrder(next);
+  send({ type: "command", action: "update_settings", settings: { sources_priority: next } });
+  lastSettingsSig = JSON.stringify(state.settings || {});
+  renderSources();
+}
+
 function renderSources() {
   const ol = document.getElementById("sources");
+  if (!ol) return;
+  if (sourcesDragging) {
+    sourcesRenderQueued = true;
+    return;
+  }
+  sourcesRenderQueued = false;
   const list = state.sources || [];
   const statusOf = (s) => {
     if (s.logged_in) return { cls: "available", label: "已登录" };
@@ -776,19 +887,36 @@ function renderSources() {
       <span class="badge ${st.cls}">${esc(st.label)}</span>
     </li>`;
   }).join("");
-  let dragId = null;
+  sourceDragId = null;
+  ol.ondragover = (e) => e.preventDefault();
+  ol.ondrop = (e) => {
+    e.preventDefault();
+    if (!sourceDragId) return;
+    commitSourceOrder(sourceDragId, sourceTargetId(e, sourcePriorityIds()));
+  };
   ol.querySelectorAll("li").forEach((li) => {
-    li.ondragstart = () => { dragId = li.dataset.id; li.classList.add("dragging"); };
-    li.ondragend = () => li.classList.remove("dragging");
+    li.ondragstart = (e) => {
+      sourceDragId = li.dataset.id;
+      sourcesDragging = true;
+      li.classList.add("dragging");
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", li.dataset.id);
+      }
+    };
+    li.ondragend = () => {
+      li.classList.remove("dragging");
+      sourcesDragging = false;
+      sourceDragId = null;
+      if (sourcesRenderQueued) renderSources();
+    };
     li.ondragover = (e) => e.preventDefault();
     li.ondrop = (e) => {
       e.preventDefault();
-      const ids = (state.settings?.sources_priority || []).slice();
-      const from = ids.indexOf(dragId);
-      const to = ids.indexOf(li.dataset.id);
-      if (from < 0 || to < 0 || from === to) return;
-      ids.splice(to, 0, ids.splice(from, 1)[0]);
-      send({ type: "command", action: "update_settings", settings: { sources_priority: ids } });
+      e.stopPropagation();
+      const fromId = sourceDragId || (e.dataTransfer && e.dataTransfer.getData("text/plain"));
+      if (!fromId) return;
+      commitSourceOrder(fromId, li.dataset.id);
     };
   });
 }
@@ -802,6 +930,7 @@ function renderSettings() {
     if (document.activeElement !== el) el.value = v ?? "";
   };
   setv("room-id", state.room_id);
+  syncBiliRoomLink();
   setv("sel-timeout", s.selection_timeout_seconds);
   setv("max-pending", anti.max_pending_per_user);
   setv("max-queue", anti.max_queue_size);
@@ -938,21 +1067,36 @@ function scheduleOverlaySave() {
   }, 200);
 }
 
+function optionalNumber(id) {
+  const el = document.getElementById(id);
+  if (!el) return undefined;
+  const raw = String(el.value ?? "").trim();
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function collectRoomSettings() {
   const actionEl = document.querySelector('input[name="timeout-action"]:checked');
-  return {
-    room_id: Number(document.getElementById("room-id").value),
-    selection_timeout_seconds: Number(document.getElementById("sel-timeout").value),
+  const settings = {
     selection: { timeout_action: (actionEl && actionEl.value) || "skip" },
-    anti_spam: {
-      max_pending_per_user: Number(document.getElementById("max-pending").value),
-      max_queue_size: Number(document.getElementById("max-queue").value),
-      cooldown_seconds: Number(document.getElementById("cooldown").value),
-    },
     priority_queue: {
       enabled: !!(document.getElementById("priority-enabled") && document.getElementById("priority-enabled").checked),
     },
   };
+  const roomId = optionalNumber("room-id");
+  if (roomId !== undefined) settings.room_id = roomId;
+  const timeout = optionalNumber("sel-timeout");
+  if (timeout !== undefined) settings.selection_timeout_seconds = timeout;
+  const anti = {};
+  const pending = optionalNumber("max-pending");
+  const queue = optionalNumber("max-queue");
+  const cooldown = optionalNumber("cooldown");
+  if (pending !== undefined) anti.max_pending_per_user = pending;
+  if (queue !== undefined) anti.max_queue_size = queue;
+  if (cooldown !== undefined) anti.cooldown_seconds = cooldown;
+  if (Object.keys(anti).length) settings.anti_spam = anti;
+  return settings;
 }
 
 function collectMessageSettings() {
@@ -1199,6 +1343,9 @@ function noteNewLogs(logs, fromSnapshot) {
   if (!fresh.length) return;
   const nl = fresh[fresh.length - 1];
   toastBaseline = { id: nl.id != null ? nl.id : toastBaseline.id, ts: Math.max(toastBaseline.ts, nl.ts || 0) };
+  if (fresh.some((l) => String(l.message || "") === "已保存设置")) {
+    settleSavesFromLog();
+  }
   fresh.filter(isPlaybackFailure).slice(-TOAST_MAX).forEach((l) => showToast(toastTitle(String(l.message || "")), l.message, l.level));
 }
 
@@ -1206,8 +1353,10 @@ function showToast(title, message, level) {
   const box = document.getElementById("toasts");
   if (!box) return;
   const el = document.createElement("div");
-  el.className = "toast " + (level === "error" ? "toast-error" : "toast-warn");
-  el.innerHTML = `<i class="toast-bar" aria-hidden="true"></i><div class="toast-body"><strong>${esc(title)}</strong><p>${formatLogMessage(message)}</p></div>`;
+  const kind = level === "error" ? "toast-error" : level === "success" ? "toast-success" : "toast-warn";
+  el.className = "toast " + kind;
+  const body = message ? `<p>${formatLogMessage(message)}</p>` : "";
+  el.innerHTML = `<i class="toast-bar" aria-hidden="true"></i><div class="toast-body"><strong>${esc(title)}</strong>${body}</div>`;
   box.appendChild(el);
   // 最多 2 条：新的一条进来，最早的那条直接让位。
   while (box.children.length > TOAST_MAX) box.firstElementChild.remove();
@@ -1272,14 +1421,26 @@ document.getElementById("now-progress").addEventListener("click", (e) => {
 });
 const btnSave = document.getElementById("btn-save");
 if (btnSave) {
-  btnSave.onclick = () => {
-    send({ type: "command", action: "update_settings", settings: collectRoomSettings() });
+  btnSave.onclick = async () => {
+    try {
+      await sendAndAck({ type: "command", action: "update_settings", settings: collectRoomSettings() });
+      showToast("设置已保存", "房间号和点歌规则已更新", "success");
+    } catch (err) {
+      if (/超时/.test(String((err && err.message) || ""))) lastSaveTimeoutAt = Date.now();
+      showToast("设置保存失败", (err && err.message) || "请稍后重试", "error");
+    }
   };
 }
 const btnSaveMsg = document.getElementById("btn-save-messages");
 if (btnSaveMsg) {
-  btnSaveMsg.onclick = () => {
-    send({ type: "command", action: "update_settings", settings: collectMessageSettings() });
+  btnSaveMsg.onclick = async () => {
+    try {
+      await sendAndAck({ type: "command", action: "update_settings", settings: collectMessageSettings() });
+      showToast("文案已保存", "欢迎语和提醒弹幕已更新", "success");
+    } catch (err) {
+      if (/超时/.test(String((err && err.message) || ""))) lastSaveTimeoutAt = Date.now();
+      showToast("文案保存失败", (err && err.message) || "请稍后重试", "error");
+    }
   };
 }
 document.getElementById("welcome-enabled").addEventListener("change", () => {
@@ -1431,24 +1592,79 @@ document.getElementById("btn-logout").onclick = async () => {
   await fetch("/api/bili/logout", { method: "POST" });
 };
 document.getElementById("btn-qr").onclick = startQr;
+const COOKIE_PLAT_LABEL = { qq: "QQ 音乐", netease: "网易云音乐", kugou: "酷狗" };
+
+async function postCookies(platform, cookies, clearing) {
+  const okTitle = clearing ? "Cookie 已清除" : "Cookie 已保存";
+  const failTitle = clearing ? "Cookie 清除失败" : "Cookie 保存失败";
+  const label = COOKIE_PLAT_LABEL[platform] || platform;
+  try {
+    const res = await fetch(`/api/cookies/${platform}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cookies }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || data.ok === false) {
+      const reason = data.error || (res.status ? "服务器返回 " + res.status : "请稍后重试");
+      showToast(failTitle, reason, "error");
+      return false;
+    }
+    showToast(
+      okTitle,
+      clearing ? ("已清除" + label + "登录信息") : ("已保存" + label + "登录信息，仅保留在这台电脑"),
+      "success",
+    );
+    return true;
+  } catch (err) {
+    showToast(failTitle, (err && err.message) || "网络错误，请稍后重试", "error");
+    return false;
+  }
+}
+
 document.getElementById("btn-save-cookie").onclick = async () => {
   const platform = document.getElementById("cookie-platform").value;
   const cookies = document.getElementById("cookie-text").value;
-  await fetch(`/api/cookies/${platform}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cookies }),
-  });
-  document.getElementById("cookie-text").value = "";
+  if (!String(cookies || "").trim()) {
+    showToast("Cookie 保存失败", "请先粘贴 Cookie", "error");
+    return;
+  }
+  const ok = await postCookies(platform, cookies, false);
+  if (ok) document.getElementById("cookie-text").value = "";
 };
 document.getElementById("btn-clear-cookie").onclick = async () => {
   const platform = document.getElementById("cookie-platform").value;
-  await fetch(`/api/cookies/${platform}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cookies: "" }),
-  });
+  await postCookies(platform, "", true);
 };
+
+function syncBiliRoomLink() {
+  const link = document.getElementById("bili-room-link");
+  const input = document.getElementById("room-id");
+  if (!link) return;
+  const raw = input ? String(input.value || "").trim() : "";
+  const id = /^\d+$/.test(raw) && Number(raw) > 0 ? raw : "";
+  if (id) {
+    link.href = "https://live.bilibili.com/" + id;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.classList.remove("is-disabled");
+    link.removeAttribute("aria-disabled");
+  } else {
+    link.removeAttribute("href");
+    link.removeAttribute("target");
+    link.removeAttribute("rel");
+    link.classList.add("is-disabled");
+    link.setAttribute("aria-disabled", "true");
+  }
+}
+
+const roomIdInput = document.getElementById("room-id");
+if (roomIdInput) {
+  roomIdInput.addEventListener("input", syncBiliRoomLink);
+  roomIdInput.addEventListener("change", syncBiliRoomLink);
+}
+syncBiliRoomLink();
 
 async function startQr() {
   const box = document.getElementById("qr-box");
