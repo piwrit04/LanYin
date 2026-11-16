@@ -116,6 +116,11 @@ function obs.obs_source_create(kind, name, settings, hotkeys)
 end
 function obs.obs_source_get_settings(src) return src.settings end
 function obs.obs_source_update(src, settings) table.insert(FAKE.updated, src.name) end
+obs.OBS_MONITORING_TYPE_NONE = 0
+obs.OBS_MONITORING_TYPE_MONITOR_ONLY = 1
+obs.OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT = 2
+function obs.obs_source_set_monitoring_type(src, t) src.monitoring = t end
+function obs.obs_source_get_monitoring_type(src) return src.monitoring or 0 end
 function obs.obs_frontend_get_current_scene() return FAKE.scene end
 function obs.obs_scene_from_source(src) return src end
 function obs.obs_scene_find_source(scene, name)

@@ -63,8 +63,16 @@ function usingExternalPlayer() {
   return false;
 }
 
+function applyOutputMute() {
+  if (!audio) return;
+  const ext = usingExternalPlayer();
+  audio.muted = ext;
+  if (ext && !audio.paused) audio.pause();
+}
+
 function handlePlayerCmd(msg) {
   if (!audio) return;
+  applyOutputMute();
   if (usingExternalPlayer()) {
     audio.pause();
     return;
@@ -128,7 +136,7 @@ function connect() {
     if (msg.type === "state") {
       state = msg.payload;
       noteNewLogs(state.logs || [], true);
-      if (usingExternalPlayer() && audio && !audio.paused) audio.pause();
+      applyOutputMute();
       render();
     } else if (msg.type === "log") {
       if (!state.logs) state.logs = [];
@@ -488,8 +496,10 @@ function iconBtn(cls, attrs, label, path) {
   return `<button type="button" class="row-btn ${cls}" ${attrs} title="${label}" aria-label="${label}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg></button>`;
 }
 
-const IC_UP = "M12 5 6 11h4v8h4v-8h4z";
-const IC_DOWN = "M12 19 18 13h-4V5h-4v8H6z";
+const IC_TOP = "M5 4h14v2H5V4zm7 3 6 6h-4v7h-4v-7H6z";
+const IC_BOTTOM = "M5 18h14v2H5v-2zm7-1-6-6h4V4h4v7h4z";
+const IC_PLAY_NOW = "M8 5.2v13.6L20 12 8 5.2z";
+const IC_PLAY_NEXT = "M5 6v12l7.5-6L5 6zm10.5 0v12h2V6h-2z";
 const IC_DEL = "M9.2 3h5.6l.8 1.6H20v1.8H4V4.6h4.4L9.2 3zM7 8h10v12.2c0 .7-.5 1.2-1.2 1.2H8.2c-.7 0-1.2-.5-1.2-1.2V8zm2.2 2.2v8h1.8v-8H9.2zm3.8 0v8h1.8v-8H13z";
 
 function trackRow(item, opts) {
@@ -520,8 +530,11 @@ function trackRow(item, opts) {
   if (canMove) {
     const atStart = !!opts.atStart;
     const atEnd = !!opts.atEnd;
-    actions.push(iconBtn("q-move", `data-move="up" data-id="${esc(item.id)}"${atStart ? " disabled" : ""}`, "上移插队", IC_UP));
-    actions.push(iconBtn("q-move", `data-move="down" data-id="${esc(item.id)}"${atEnd ? " disabled" : ""}`, "下移", IC_DOWN));
+    const src = opts.list || "queue";
+    actions.push(iconBtn("q-play", `data-play="now" data-src="${src}" data-id="${esc(item.id)}"`, "立刻播放", IC_PLAY_NOW));
+    actions.push(iconBtn("q-play", `data-play="next" data-src="${src}" data-id="${esc(item.id)}"`, "下一首播放", IC_PLAY_NEXT));
+    actions.push(iconBtn("q-move", `data-move="top" data-src="${src}" data-id="${esc(item.id)}"${atStart ? " disabled" : ""}`, "置顶", IC_TOP));
+    actions.push(iconBtn("q-move", `data-move="bottom" data-src="${src}" data-id="${esc(item.id)}"${atEnd ? " disabled" : ""}`, "置底", IC_BOTTOM));
   }
   if (canDelete) actions.push(iconBtn("danger", `data-del="${esc(item.id)}"`, "移除", IC_DEL));
   const tools = actions.length ? `<div class="q-actions">${actions.join("")}</div>` : "<span class=\"q-actions\"></span>";
@@ -542,6 +555,36 @@ function trackRow(item, opts) {
       <time class="q-time">${dur}</time>
       ${tools}
     </li>`;
+}
+
+function bindRowActions(root, list) {
+  root.querySelectorAll("[data-move]").forEach((btn) => {
+    btn.onclick = async () => {
+      const dest = btn.dataset.move;
+      const id = btn.dataset.id;
+      if (!id || (dest !== "top" && dest !== "bottom")) return;
+      const url = list === "idle" ? "/api/idle_playlist/move" : "/api/queue/move";
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, dest }),
+      });
+    };
+  });
+  root.querySelectorAll("[data-play]").forEach((btn) => {
+    btn.onclick = async () => {
+      const kind = btn.dataset.play;
+      const id = btn.dataset.id;
+      const source = btn.dataset.src || list;
+      if (!id || (kind !== "now" && kind !== "next")) return;
+      const url = kind === "now" ? "/api/queue/play_now" : "/api/queue/play_next";
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, source }),
+      });
+    };
+  });
 }
 
 async function submitQueueOrder(ids) {
@@ -578,17 +621,7 @@ function renderQueue() {
   ul.querySelectorAll("[data-del]").forEach((btn) => {
     btn.onclick = () => send({ type: "command", action: "delete", item_id: btn.dataset.del });
   });
-  ul.querySelectorAll("[data-move]").forEach((btn) => {
-    btn.onclick = async () => {
-      const ids = (state.queue || []).map((it) => it.id);
-      const from = ids.indexOf(btn.dataset.id);
-      if (from < 0) return;
-      const to = btn.dataset.move === "up" ? from - 1 : from + 1;
-      if (to < 0 || to >= ids.length) return;
-      ids.splice(to, 0, ids.splice(from, 1)[0]);
-      await submitQueueOrder(ids);
-    };
-  });
+  bindRowActions(ul, "queue");
   let dragId = null;
   ul.querySelectorAll("li.is-movable[data-id]").forEach((li) => {
     li.ondragstart = () => { dragId = li.dataset.id; li.classList.add("dragging"); };
@@ -646,7 +679,13 @@ function renderIdle() {
         </div>
         <span class="q-tags"></span>
         <time class="q-time">${dur}</time>
-        <div class="q-actions">${iconBtn("danger", `data-idle-del="${esc(item.id)}"`, "移除", IC_DEL)}</div>
+        <div class="q-actions">
+          ${iconBtn("q-play", `data-play="now" data-src="idle" data-id="${esc(item.id)}"`, "立刻播放", IC_PLAY_NOW)}
+          ${iconBtn("q-play", `data-play="next" data-src="idle" data-id="${esc(item.id)}"`, "下一首播放", IC_PLAY_NEXT)}
+          ${iconBtn("q-move", `data-move="top" data-src="idle" data-id="${esc(item.id)}"${i === 0 ? " disabled" : ""}`, "置顶", IC_TOP)}
+          ${iconBtn("q-move", `data-move="bottom" data-src="idle" data-id="${esc(item.id)}"${i === items.length - 1 ? " disabled" : ""}`, "置底", IC_BOTTOM)}
+          ${iconBtn("danger", `data-idle-del="${esc(item.id)}"`, "移除", IC_DEL)}
+        </div>
       </li>`;
   }).join("");
   ul.querySelectorAll("[data-idle-del]").forEach((btn) => {
@@ -658,6 +697,7 @@ function renderIdle() {
       });
     };
   });
+  bindRowActions(ul, "idle");
   let dragId = null;
   ul.querySelectorAll("li[data-id]").forEach((li) => {
     li.ondragstart = () => { dragId = li.dataset.id; li.classList.add("dragging"); };

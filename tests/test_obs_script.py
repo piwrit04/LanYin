@@ -18,10 +18,17 @@ if sys.platform != "linux":
 from tests.obs_fake import REPO, FakeObs, free_port, make_project_copy  # noqa: E402
 
 
-def _health(port):
+def _health(port, retries=8, delay=0.25):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with opener.open(f"http://127.0.0.1:{port}/api/health", timeout=2) as r:
-        return json.loads(r.read())
+    last = None
+    for _ in range(retries):
+        try:
+            with opener.open(f"http://127.0.0.1:{port}/api/health", timeout=2) as r:
+                return json.loads(r.read())
+        except OSError as exc:
+            last = exc
+            time.sleep(delay)
+    raise last
 
 
 def _port_free(port):
@@ -59,7 +66,7 @@ def test_properties_have_no_auto_add_and_have_buttons(proj):
     names = [n for _, n in items]
     assert "auto_sources" not in names
     assert {"btn_start", "btn_popout", "btn_sources", "btn_stop"} <= set(names)
-    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=37"
+    assert obs.g.console_url() == f"http://127.0.0.1:{port}/window?v=38"
 
 
 def test_load_starts_server_no_sources_and_exit_stops_it(proj):
@@ -178,3 +185,44 @@ def test_first_run_without_venv_tries_path_pythonw(tmp_path):
     assert [s["cmd"].split()[0].strip('"') for s in bare][:2] == ["pythonw", "pyw"]
     assert all("start_win.py" in s["cmd"] and "--hidden" in s["cmd"] for s in obs.spawned)
     assert any("启动失败" in m for m in obs.logs)
+
+
+
+def test_audio_monitor_and_no_update_when_url_unchanged(proj):
+    root, port = proj
+    obs = FakeObs(root)
+    # 预先已有「澜音音频」，脚本加载时自动开监听，但不加到场景、URL 不变不 update
+    lua_src = obs.lua.eval(
+        "function(n, u) local d = obslua.obs_data_create(); obslua.obs_data_set_string(d, 'url', u); return obslua.obs_source_create('browser_source', n, d, nil) end"
+    )
+    url = f"http://127.0.0.1:{port}/player"
+    lua_src("澜音音频", url)
+    before = list(obs.fake.updated)
+    obs.g.script_load(obs.settings(auto_start=False, auto_popup=False))
+    src = obs.fake.sources["澜音音频"]
+    assert src["monitoring"] == obs.g.obslua.OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT
+    assert src["settings"]["_v"]["url"] == url
+    assert list(obs.fake.updated) == list(before)
+    assert len(obs.fake.scene["items"]) == 0  # 不自动加到场景
+
+    obs.g.refresh_browser_sources()
+    assert list(obs.fake.updated) == list(before)
+    assert src["monitoring"] == 2
+
+
+def test_auto_popup_only_once_on_load_and_finished(proj):
+    root, port = proj
+    obs = FakeObs(root)
+    try:
+        obs.g.script_load(obs.settings(auto_popup=True))
+        assert obs.wait_ready(), obs.logs
+        obs.fake.fire(obs.g.obslua.OBS_FRONTEND_EVENT_FINISHED_LOADING)
+        time.sleep(0.2)
+        pops = [s for s in obs.spawned if "open_console_window.py" in s.get("cmd", "")]
+        assert len(pops) == 1, pops
+        # 手动按钮仍可再弹（交给 open_console_window.py 聚焦已有窗口）
+        obs.g.on_popout_clicked(None, None)
+        pops2 = [s for s in obs.spawned if "open_console_window.py" in s.get("cmd", "")]
+        assert len(pops2) == 2
+    finally:
+        obs.cleanup()

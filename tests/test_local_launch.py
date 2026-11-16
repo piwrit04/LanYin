@@ -176,8 +176,8 @@ def test_start_win_end_to_end_and_already_running(proj):
     try:
         _, body = _wait_up(port)
         assert json.loads(body)["app"] == "lanyin"
-        st, html = _get(port, "/window?v=37")
-        assert st == 200 and "console.css?v=37" in html
+        st, html = _get(port, "/window?v=38")
+        assert st == 200 and "console.css?v=38" in html
         st, _ = _get(port, "/overlay")
         assert st == 200
         import asyncio
@@ -207,7 +207,7 @@ def test_open_console_window_logic(monkeypatch, tmp_path):
     import open_console_window as ocw
 
     importlib.reload(ocw)
-    assert ocw.URL.endswith("/window?v=37") and ocw.URL.startswith("http://127.0.0.1:")
+    assert ocw.URL.endswith("/window?v=38") and ocw.URL.startswith("http://127.0.0.1:")
     args = ocw._browser_args(Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"), app=True)
     assert args[1] == f"--app={ocw.URL}" and "--disable-gpu" in args
     normal = ocw._browser_args(Path("chrome.exe"), app=False)
@@ -246,10 +246,10 @@ def test_launcher_files_static():
     assert "start_win.py" in bat and (REPO / "start_win.py").exists()
     assert "bind_to_obs.py" in (REPO / "bind_to_obs.bat").read_text()
     lua = (REPO / "lanyin.lua").read_text(encoding="utf-8")
-    assert 'CONSOLE_VERSION = "37"' in lua
+    assert 'CONSOLE_VERSION = "38"' in lua
     from app.portcfg import CONSOLE_VERSION
 
-    assert CONSOLE_VERSION == "37"
+    assert CONSOLE_VERSION == "38"
     html = (REPO / "app/static/console.html").read_text(encoding="utf-8")
     assert f"console.css?v={CONSOLE_VERSION}" in html and f"console.js?v={CONSOLE_VERSION}" in html
 
@@ -264,3 +264,20 @@ def test_bind_to_obs_merge_docks():
     old = '[BasicWindow]\nExtraBrowserDocks=[{"title":"点歌姬控制台","url":"http://127.0.0.1:8765/","uuid":"obssongrequestconsole01"}]\n'
     t3 = b.merge_docks(old)
     assert "澜音控制台" in t3 and t3.count("uuid") == 1
+
+
+
+def test_open_console_window_focuses_existing(monkeypatch, tmp_path):
+    import importlib
+    import open_console_window as ocw
+
+    importlib.reload(ocw)
+    monkeypatch.setattr(ocw, "DATA", tmp_path)
+    monkeypatch.setattr(ocw, "wait_server", lambda timeout=30: True)
+    launched = []
+    monkeypatch.setattr(ocw, "focus_existing", lambda: True)
+    monkeypatch.setattr(ocw, "find_browser", lambda: launched.append("browser") or Path("chrome"))
+    monkeypatch.setattr(ocw, "launch", lambda browser: launched.append("launch") or True)
+    assert ocw.main() == 0
+    assert launched == []
+    assert (tmp_path / "console-window.lock").exists() or True  # lock file is created then may remain

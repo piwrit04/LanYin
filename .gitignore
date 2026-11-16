@@ -20,3 +20,6 @@ data/console-window-profile/
 data/*.pid
 data/*.ready
 logs/
+
+data/playback.json
+data/console-window.lock

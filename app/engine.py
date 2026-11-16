@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+from pathlib import Path
 import time
 import uuid
 from typing import Any, Optional
@@ -27,7 +30,7 @@ from app.queue_rules import (
     user_is_blocked,
 )
 from app.sources.bili import collection_play_order, episode_start_index
-from app.settings import DEFAULT_MESSAGES, load_config, normalize_idle_items, save_config
+from app.settings import DEFAULT_MESSAGES, PLAYBACK_PATH, load_config, normalize_idle_items, save_config
 from app.sources.registry import all_adapters, get_adapter
 from app.welcome import WelcomeGate, compose_welcome
 
@@ -53,6 +56,8 @@ class SongEngine:
         self._outgoing_for_history: dict[str, Any] | None = None
         self._history_max = 30
         self._pending_priv: dict[int, dict[str, Any]] = {}
+        self._playback_saved_at: float = 0.0
+        self._restored_paused = False
 
     # ------------------------------------------------------------------ helpers
     def cfg(self) -> dict[str, Any]:
@@ -529,6 +534,10 @@ class SongEngine:
     async def _maybe_start(self) -> None:
         if self._has_queued_request():
             self._cancel_idle_delay()
+            # 启动恢复的暂停曲不应挡住直播点歌：让出当前位，但排在新点歌后面。
+            if self._restored_paused and self.hub().current:
+                await self._park_current_for_interrupt(ahead=False)
+                self._restored_paused = False
         await self._preempt_idle_for_requests()
         if self.hub().current:
             return
@@ -1460,13 +1469,18 @@ class SongEngine:
         self._persist_config()
         await self.push_state()
 
-    async def _begin_playback(self, item: QueueItem, playable: Playable, *, position: float = 0) -> None:
+    async def _begin_playback(
+        self, item: QueueItem, playable: Playable, *, position: float = 0, paused: bool = False
+    ) -> None:
         self._commit_outgoing_history(item)
         pos = max(0.0, float(position or 0))
         lyric = playable.lyric or ""
         self._playables[item.id] = playable
-        self.hub().current = CurrentTrack(item=item, position=pos, paused=False, lyric=lyric)
-        if self._is_idle_item(item) and pos > 1:
+        self.hub().current = CurrentTrack(item=item, position=pos, paused=bool(paused), lyric=lyric)
+        self._restored_paused = bool(paused)
+        if paused:
+            self.log("info", f"已恢复上次播放：{item.title} - {item.artist}（已暂停）")
+        elif self._is_idle_item(item) and pos > 1:
             self.log("info", f"继续播放默认歌单：{item.title} - {item.artist}")
         elif self._is_idle_item(item):
             self.log("info", f"开始播放默认歌单：{item.title} - {item.artist}")
@@ -1478,10 +1492,12 @@ class SongEngine:
             "item": item.to_dict(),
             "stream_url": f"/api/stream/{item.id}",
             "lyric": lyric,
+            "paused": bool(paused),
         }
         if pos > 0.2:
             cmd["position"] = pos
         await self.hub().send_player_cmd(cmd)
+        self._save_playback(force=True)
         await self.push_state()
 
     async def skip(self) -> None:
@@ -1500,12 +1516,15 @@ class SongEngine:
         if self.hub().current:
             self.hub().current.paused = True
             await self.hub().send_player_cmd({"type": "player_cmd", "action": "pause"})
+            self._save_playback(force=True)
             await self.push_state()
 
     async def resume(self) -> None:
         if self.hub().current:
             self.hub().current.paused = False
+            self._restored_paused = False
             await self.hub().send_player_cmd({"type": "player_cmd", "action": "resume"})
+            self._save_playback(force=True)
             await self.push_state()
 
     async def delete_item(self, item_id: str) -> None:
@@ -1539,6 +1558,269 @@ class SongEngine:
         self.hub().queue = new_list
         await self.push_state()
 
+    def _playback_file(self):
+        custom = getattr(self.app, "playback_path", None)
+        if custom:
+            return Path(custom)
+        env_path = os.environ.get("LANYIN_PLAYBACK_PATH")
+        if env_path:
+            return Path(env_path)
+        # pytest 不要改用户的 data/playback.json
+        if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("LANYIN_USE_REAL_PLAYBACK"):
+            return Path((os.environ.get("TMPDIR") or "/tmp") + "/lanyin-pytest-playback.json")
+        return PLAYBACK_PATH
+
+    def _save_playback(self, *, force: bool = False) -> None:
+        cur = self.hub().current
+        path = self._playback_file()
+        if not cur or not cur.item:
+            self._clear_playback()
+            return
+        now = time.time()
+        if not force and (now - self._playback_saved_at) < 1.5:
+            return
+        payload = {
+            "version": 1,
+            "item": cur.item.to_dict(),
+            "position": float(cur.position or 0),
+            "saved_at": now,
+        }
+        tmp = path.with_suffix(".json.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp.replace(path)
+            self._playback_saved_at = now
+        except Exception:
+            try:
+                if tmp.exists():
+                    tmp.unlink()
+            except Exception:
+                pass
+
+    def _clear_playback(self) -> None:
+        path = self._playback_file()
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+        self._playback_saved_at = 0.0
+
+    def _load_playback(self) -> dict[str, Any] | None:
+        path = self._playback_file()
+        try:
+            if not path.is_file():
+                return None
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
+    async def _resolve_saved_item(self, item: QueueItem) -> Playable | None:
+        adapter = get_adapter(item.source) if item.source else None
+        result = SearchResult(
+            source=item.source,
+            source_id=item.source_id,
+            title=item.title,
+            artist=item.artist,
+            duration=item.duration,
+            cover_url=item.cover_url,
+            extra=dict(item.extra or {}),
+        )
+        if adapter:
+            playable = await self._try_resolve(adapter, result)
+            if playable:
+                return playable
+        query = (item.query or item.title or "").strip()
+        if query:
+            try:
+                found, _others, _src, _fails = await self._search_by_priority(query)
+            except Exception:
+                found = None
+            if found:
+                adapter = get_adapter(found.source)
+                if adapter:
+                    return await self._try_resolve(adapter, found)
+        return None
+
+    async def restore_last_playback(self) -> bool:
+        """启动时恢复上次歌曲和进度，保持暂停。不会自动开播默认歌单。"""
+        data = self._load_playback()
+        if not data or not isinstance(data.get("item"), dict):
+            return False
+        item = QueueItem.from_dict(data["item"])
+        if not item.id or not (item.title or item.query or item.source_id):
+            return False
+        try:
+            position = float(data.get("position") or 0)
+        except (TypeError, ValueError):
+            position = 0.0
+        if position < 0:
+            position = 0.0
+        playable = await self._resolve_saved_item(item)
+        if not playable:
+            self.log("warn", f"上次播放的「{item.title or item.query}」暂时无法恢复")
+            return False
+        duration = item.duration or playable.result.duration or 0
+        if duration and position >= max(duration - 2, duration * 0.98):
+            self._clear_playback()
+            return False
+        if not playable.lyric:
+            adapter = get_adapter(item.source)
+            if adapter:
+                try:
+                    playable.lyric = await adapter.fetch_lyric(playable.result)
+                except Exception:
+                    pass
+        await self._begin_playback(item, playable, position=position, paused=True)
+        return True
+
+    async def move_queue_item(self, item_id: str, dest: str) -> None:
+        ids = [i.id for i in self.hub().queue]
+        if item_id not in ids:
+            return
+        ids.remove(item_id)
+        if dest == "bottom":
+            ids.append(item_id)
+        else:
+            ids.insert(0, item_id)
+        await self.reorder_queue(ids)
+
+    async def move_idle_item(self, item_id: str, dest: str) -> None:
+        items = [x for x in self._idle_playlist_items() if isinstance(x, dict)]
+        ids = [str(it.get("id")) for it in items if it.get("id")]
+        if item_id not in ids:
+            return
+        ids.remove(item_id)
+        if dest == "bottom":
+            ids.append(item_id)
+        else:
+            ids.insert(0, item_id)
+        await self.reorder_idle_items(ids)
+
+    async def _park_current_for_interrupt(self, *, ahead: bool = True) -> None:
+        cur = self.hub().current
+        if not cur:
+            return
+        if self._is_idle_item(cur.item):
+            self._paused_idle = {
+                "item": cur.item,
+                "position": float(cur.position or 0),
+                "lyric": cur.lyric or "",
+            }
+            pos = int(cur.position or 0)
+            self.log("info", f"已暂停默认歌单：{cur.item.title}（{pos // 60}:{pos % 60:02d}）")
+        else:
+            others = [i for i in self.hub().queue if i.id != cur.item.id]
+            if ahead:
+                self.hub().queue = [cur.item] + others
+            else:
+                # 让已在队列里的点歌先播，恢复的暂停曲跟在后面。
+                live = [i for i in others if not self._is_idle_item(i)]
+                idle = [i for i in others if self._is_idle_item(i)]
+                self.hub().queue = live + [cur.item] + idle
+            self.log("info", f"已把正在播放的「{cur.item.title}」放回队列")
+        self._stash_outgoing(cur)
+        self.hub().current = None
+
+    def _take_queue_item(self, item_id: str) -> QueueItem | None:
+        for i, it in enumerate(self.hub().queue):
+            if it.id == item_id:
+                return self.hub().queue.pop(i)
+        return None
+
+    async def play_item_now(self, item_id: str, *, source: str = "queue") -> None:
+        """立刻播放队列或默认歌单中的一首。"""
+        src = str(source or "queue")
+        cur = self.hub().current
+        if cur and cur.item.id == item_id and src != "idle":
+            if cur.paused:
+                await self.resume()
+            return
+        if src == "idle":
+            spec = next((x for x in self._idle_playlist_items() if str(x.get("id")) == item_id), None)
+            if not spec:
+                self.log("warn", "默认歌单里找不到要播放的曲子")
+                await self.push_state()
+                return
+            resolved = await self._resolve_idle_item(spec)
+            if not resolved:
+                title = spec.get("title") or spec.get("query") or spec.get("bvid") or "这首"
+                self.log("warn", f"默认歌单「{title}」暂时无法播放")
+                await self.push_state()
+                return
+            item, playable = resolved
+            items = self._idle_playlist_items()
+            try:
+                idx = next(i for i, x in enumerate(items) if str(x.get("id")) == item_id)
+                self._idle_index = idx + 1
+                item.extra = {**(item.extra or {}), "idle_index": idx, "idle_spec_id": item_id}
+            except StopIteration:
+                pass
+            await self._park_current_for_interrupt()
+            await self._begin_playback(item, playable, position=0)
+            return
+        item = self._take_queue_item(item_id)
+        if not item:
+            self.log("warn", "队列里找不到要播放的曲子")
+            await self.push_state()
+            return
+        playable = self.get_playable(item.id)
+        if not playable:
+            adapter = get_adapter(item.source)
+            if adapter:
+                result = SearchResult(
+                    source=item.source,
+                    source_id=item.source_id,
+                    title=item.title,
+                    artist=item.artist,
+                    duration=item.duration,
+                    cover_url=item.cover_url,
+                    extra=dict(item.extra or {}),
+                )
+                playable = await self._try_resolve(adapter, result)
+        if not playable:
+            self.log("warn", f"「{item.title}」暂时无法播放")
+            self.hub().queue.insert(0, item)
+            await self.push_state()
+            return
+        await self._park_current_for_interrupt()
+        await self._begin_playback(item, playable, position=0)
+
+    async def play_item_next(self, item_id: str, *, source: str = "queue") -> None:
+        """把一首歌放到下一首播放。"""
+        src = str(source or "queue")
+        if src == "idle":
+            spec = next((x for x in self._idle_playlist_items() if str(x.get("id")) == item_id), None)
+            if not spec:
+                self.log("warn", "默认歌单里找不到要插入的曲子")
+                await self.push_state()
+                return
+            resolved = await self._resolve_idle_item(spec)
+            if not resolved:
+                title = spec.get("title") or spec.get("query") or spec.get("bvid") or "这首"
+                self.log("warn", f"默认歌单「{title}」暂时无法播放")
+                await self.push_state()
+                return
+            item, playable = resolved
+            self._playables[item.id] = playable
+            self.hub().queue = [item] + [i for i in self.hub().queue if i.id != item.id]
+            self.log("info", f"下一首播放：{item.title} - {item.artist}")
+            await self.push_state()
+            return
+        ids = [i.id for i in self.hub().queue]
+        if item_id not in ids:
+            self.log("warn", "队列里找不到要插入的曲子")
+            await self.push_state()
+            return
+        ids.remove(item_id)
+        ids.insert(0, item_id)
+        await self.reorder_queue(ids)
+        item = next((i for i in self.hub().queue if i.id == item_id), None)
+        if item:
+            self.log("info", f"下一首播放：{item.title} - {item.artist}")
+
     def on_player_progress(self, position: float, duration: float, paused: bool) -> None:
         cur = self.hub().current
         if not cur:
@@ -1547,6 +1829,7 @@ class SongEngine:
         cur.paused = bool(paused)
         if duration and not cur.item.duration:
             cur.item.duration = int(duration)
+        self._save_playback()
 
     async def on_player_ended(self) -> None:
         cur = self.hub().current

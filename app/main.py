@@ -130,14 +130,20 @@ def _clear_pid() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_dirs()
-    _write_pid()
     state.config = load_config()
     state.hub.log("info", f"澜音启动，默认房间号 {state.config['room_id']}")
     await start_danmaku()
-    await state.engine._maybe_start()
+    # 启动只恢复上次歌曲和进度，并保持暂停；有人点歌仍会马上播放。
+    await state.engine.restore_last_playback()
+    # ready 标志放在启动完成之后再写，避免 OBS / 测试在服务还没开始接请求时就以为已就绪。
+    _write_pid()
     try:
         yield
     finally:
+        try:
+            state.engine._save_playback(force=True)
+        except Exception:
+            pass
         if state.danmaku:
             await state.danmaku.stop()
         _clear_pid()
@@ -248,6 +254,22 @@ async def handle_command(data: dict[str, Any]) -> None:
         ids = data.get("ids") or []
         if isinstance(ids, list):
             await state.engine.reorder_queue([str(i) for i in ids])
+    elif action == "queue_move":
+        dest = str(data.get("dest") or data.get("where") or "top")
+        await state.engine.move_queue_item(str(data.get("item_id") or data.get("id") or ""), dest)
+    elif action == "idle_move":
+        dest = str(data.get("dest") or data.get("where") or "top")
+        await state.engine.move_idle_item(str(data.get("item_id") or data.get("id") or ""), dest)
+    elif action == "play_now":
+        await state.engine.play_item_now(
+            str(data.get("item_id") or data.get("id") or ""),
+            source=str(data.get("source") or "queue"),
+        )
+    elif action == "play_next":
+        await state.engine.play_item_next(
+            str(data.get("item_id") or data.get("id") or ""),
+            source=str(data.get("source") or "queue"),
+        )
     elif action == "choose":
         await state.engine.try_choose(
             uid=0,
@@ -534,6 +556,42 @@ async def api_queue_reorder(request: Request):
     await state.engine.reorder_queue([str(i) for i in ids])
     return {"ok": True}
 
+
+
+@app.post("/api/queue/move")
+async def api_queue_move(request: Request):
+    body = await request.json()
+    dest = str(body.get("dest") or body.get("where") or "top")
+    await state.engine.move_queue_item(str(body.get("id") or body.get("item_id") or ""), dest)
+    return {"ok": True}
+
+
+@app.post("/api/queue/play_now")
+async def api_queue_play_now(request: Request):
+    body = await request.json()
+    await state.engine.play_item_now(
+        str(body.get("id") or body.get("item_id") or ""),
+        source=str(body.get("source") or "queue"),
+    )
+    return {"ok": True}
+
+
+@app.post("/api/queue/play_next")
+async def api_queue_play_next(request: Request):
+    body = await request.json()
+    await state.engine.play_item_next(
+        str(body.get("id") or body.get("item_id") or ""),
+        source=str(body.get("source") or "queue"),
+    )
+    return {"ok": True}
+
+
+@app.post("/api/idle_playlist/move")
+async def api_idle_move(request: Request):
+    body = await request.json()
+    dest = str(body.get("dest") or body.get("where") or "top")
+    await state.engine.move_idle_item(str(body.get("id") or body.get("item_id") or ""), dest)
+    return {"ok": True, "idle_playlist": state.config.get("idle_playlist")}
 
 @app.post("/api/console_window")
 async def api_console_window():

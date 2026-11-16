@@ -4,7 +4,7 @@ SOURCE_OVERLAY = "澜音覆盖层"
 SOURCE_AUDIO = "澜音音频"
 OLD_SOURCE_OVERLAY = "点歌姬覆盖层"
 OLD_SOURCE_AUDIO = "点歌姬音频"
-CONSOLE_VERSION = "37"
+CONSOLE_VERSION = "38"
 DEFAULT_PORT = 8765
 
 auto_start = true
@@ -14,6 +14,7 @@ loaded = false
 poll_count = 0
 launching_pid = nil
 owned_pending = false
+console_popup_queued = false
 
 ffi = nil
 kernel32 = nil
@@ -144,8 +145,12 @@ end
 function script_load(settings)
   script_update(settings)
   loaded = true
+  console_popup_queued = false
   obs.obs_frontend_add_event_callback(on_frontend_event)
   migrate_legacy_sources()
+  -- 已有的「澜音音频」自动打开「监听并输出」，用户不用再去混音器里开监听。
+  -- 不会自动把源加到场景。
+  refresh_browser_sources()
   if auto_start then
     start_server()
   end
@@ -153,6 +158,7 @@ end
 
 function script_unload()
   loaded = false
+  console_popup_queued = false
   obs.timer_remove(poll_ready)
   obs.obs_frontend_remove_event_callback(on_frontend_event)
 end
@@ -160,6 +166,7 @@ end
 function on_frontend_event(event)
   if event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING then
     migrate_legacy_sources()
+    refresh_browser_sources()
     if auto_start then
       start_server()
     end
@@ -357,6 +364,17 @@ function already_starting()
   return false
 end
 
+function maybe_auto_popup()
+  if not auto_popup then
+    return
+  end
+  if console_popup_queued then
+    return
+  end
+  console_popup_queued = true
+  open_console_window()
+end
+
 function open_console_window()
   local root = project_root()
   local script = path_join(root, "open_console_window.py")
@@ -382,9 +400,7 @@ function start_server()
   if server_is_up() then
     file_log("澜音已经在运行（" .. base_url() .. "）")
     refresh_browser_sources()
-    if auto_popup then
-      open_console_window()
-    end
+    maybe_auto_popup()
     return
   end
   if already_starting() then
@@ -491,9 +507,7 @@ function poll_ready()
       owned_pending = false
     end
     refresh_browser_sources()
-    if auto_popup then
-      open_console_window()
-    end
+    maybe_auto_popup()
     obs.timer_remove(poll_ready)
     return
   end
@@ -624,6 +638,21 @@ function ensure_sources()
   refresh_browser_sources()
 end
 
+-- 让主播听到和观众一样的声音：对「澜音音频」打开「监听并输出」。
+-- 不新建来源，也不把来源加到场景。
+function apply_audio_monitor(src)
+  if src == nil then
+    return
+  end
+  local mode = obs.OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT
+  if mode == nil then
+    mode = 2
+  end
+  if obs.obs_source_set_monitoring_type ~= nil then
+    obs.obs_source_set_monitoring_type(src, mode)
+  end
+end
+
 function refresh_browser_sources()
   migrate_legacy_sources()
   local names = {SOURCE_OVERLAY, SOURCE_AUDIO}
@@ -632,17 +661,24 @@ function refresh_browser_sources()
     if src ~= nil then
       local settings = obs.obs_source_get_settings(src)
       local url = obs.obs_data_get_string(settings, "url")
-      -- 改过端口后，把旧的 127.0.0.1:端口 地址换成当前端口
+      -- 改过端口后，把旧的 127.0.0.1:端口 地址换成当前端口。
+      -- URL 没变时不要 obs_source_update，否则浏览器源会重载、声音中断。
       local want = (names[i] == SOURCE_OVERLAY) and overlay_url() or player_url()
       local path = string.match(url or "", "^http://127%.0%.0%.1:%d+(/.*)$") or string.match(url or "", "^http://localhost:%d+(/.*)$")
+      local new_url = url
       if path then
         local base_path = string.match(want, "^http://[^/]+(/[^?]*)")
         if string.sub(path, 1, #base_path) == base_path then
-          url = base_url() .. path
+          new_url = base_url() .. path
         end
       end
-      obs.obs_data_set_string(settings, "url", url)
-      obs.obs_source_update(src, settings)
+      if new_url ~= url then
+        obs.obs_data_set_string(settings, "url", new_url)
+        obs.obs_source_update(src, settings)
+      end
+      if names[i] == SOURCE_AUDIO then
+        apply_audio_monitor(src)
+      end
       obs.obs_data_release(settings)
       obs.obs_source_release(src)
     end

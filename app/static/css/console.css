@@ -737,7 +737,7 @@ body.is-standalone .btn-popout { display: none; }
   flex: none;
 }
 .stage-more { position: absolute; top: 10px; right: 10px; z-index: 4; }
-.more-btn { width: 28px; height: 28px; border-radius: 8px; }
+.more-btn { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .more-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -1836,8 +1836,8 @@ body.is-standalone .settings-drawer {
 
 .song-list li, .queue li, .idle-list li {
   position: relative;
-  /* 序号 | 封面 | 标题两行 | 标记列（固定宽，点歌/舰长竖向对齐） | 时长（宽度够放三颗操作按钮） */
-  grid-template-columns: 24px 44px minmax(0, 1fr) 96px 88px;
+  /* 序号 | 封面 | 标题两行 | 标记列（固定宽，点歌/舰长竖向对齐，紧挨时长左侧） | 时长（宽度够放五颗操作按钮，避免盖住标签） */
+  grid-template-columns: 24px 44px minmax(0, 1fr) 96px 148px;
   gap: 12px;
   padding: 8px 10px;
 }
@@ -1849,7 +1849,7 @@ body.is-standalone .settings-drawer {
 .q-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .q-line .q-title { flex: 0 1 auto; min-width: 0; }
 .q-artist { flex: 0 1 auto; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.song-list .q-tags { display: flex; justify-content: flex-start; align-items: center; gap: 4px; min-width: 0; }
+.song-list .q-tags { display: flex; justify-content: flex-start; align-items: center; gap: 4px; min-width: 96px; box-sizing: border-box; }
 .song-list .q-time { width: auto; text-align: right; }
 .q-sub { margin-top: 1px; }
 .q-time { transition: opacity 0.15s ease; }

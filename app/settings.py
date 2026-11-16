@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 DATA_DIR = ROOT / "data"
 SECRETS_PATH = DATA_DIR / "secrets.json"
+PLAYBACK_PATH = DATA_DIR / "playback.json"
 
 DEFAULT_MESSAGES: dict[str, str] = {
     "not_found": "未找到可播原曲",

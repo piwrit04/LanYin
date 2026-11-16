@@ -63,7 +63,7 @@ def test_console_v36_quiet_player_structure():
     html = (root / "console.html").read_text(encoding="utf-8")
     js = (root / "js/console.js").read_text(encoding="utf-8")
     css = (root / "css/console.css").read_text(encoding="utf-8")
-    assert "console.css?v=37" in html and "console.js?v=37" in html
+    assert "console.css?v=38" in html and "console.js?v=38" in html
     assert "vinyl" not in html and 'class="cover-stage album"' in html and 'id="cover"' in html
     # 旧状态 pill 的 id 仍在（JS 依赖），但收进了一个状态浮层
     for pid in ("pill-danmaku", "pill-login", "pill-player", "pill-room"):
@@ -82,3 +82,23 @@ def test_console_v36_quiet_player_structure():
     assert "tag-idle\">默认歌单" not in js
     # 空状态示例是「例如」后的示例文字
     assert "例如" in html and "例如" in js
+
+
+def test_console_v38_playlist_actions_and_tag():
+    root = Path(__file__).resolve().parents[1] / "app/static"
+    js = (root / "js/console.js").read_text(encoding="utf-8")
+    css = (root / "css/console.css").read_text(encoding="utf-8")
+    assert "上移" not in js and "下移" not in js
+    assert "置顶" in js and "置底" in js
+    assert "立刻播放" in js and "下一首播放" in js
+    assert 'data-move="top"' in js and 'data-move="bottom"' in js
+    assert 'data-play="now"' in js and 'data-play="next"' in js
+    assert "function bindRowActions" in js
+    assert "function applyOutputMute" in js
+    # 「点歌」仍在时长左侧的固定标记列，不插进标题行
+    assert '<div class="q-line"><span class="q-title">${esc(item.title)}</span>${item.artist ? `<span class="q-artist">${esc(item.artist)}</span>` : ""}</div>' in js
+    assert '<span class="q-tags">${tag}</span>' in js
+    assert js.index('<span class="q-tags">${tag}</span>') > js.index('class="q-line"')
+    assert "标记列" in css
+    assert "minmax(0, 1fr) 96px 148px" in css
+    assert ".q-line .q-tags" not in css

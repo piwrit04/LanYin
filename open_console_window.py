@@ -2,6 +2,7 @@
 """Open a standalone, properly sized console window (Edge/Chrome app mode)."""
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -17,7 +18,7 @@ from app.portcfg import base_url, http_get, window_url  # noqa: E402  (stdlib on
 
 DATA = ROOT / "data"
 PROFILE = DATA / "console-window-profile"
-# 端口跟 config.yaml 走（默认 8765），版本号跟 console.html 的 ?v=37 一致
+# 端口跟 config.yaml 走（默认 8765），版本号跟 console.html 的 ?v=38 一致
 URL = window_url()
 TITLE = "澜音控制台"
 WIDTH, HEIGHT = 1320, 900
@@ -261,29 +262,74 @@ def launch(browser: Path) -> bool:
     return False
 
 
+
+@contextlib.contextmanager
+def _launch_lock():
+    """同一时刻只允许一个弹窗进程启动，避免自动启动连开两个窗口。"""
+    DATA.mkdir(parents=True, exist_ok=True)
+    path = DATA / "console-window.lock"
+    fh = open(path, "a+b")
+    locked = False
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            fh.seek(0)
+            if fh.read(1) == b"":
+                fh.write(b"\0")
+                fh.flush()
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+            locked = True
+        else:
+            import fcntl
+
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            locked = True
+        yield
+    finally:
+        try:
+            if locked and os.name == "nt":
+                import msvcrt
+
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            elif locked:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except Exception:
+            pass
+        try:
+            fh.close()
+        except Exception:
+            pass
+
+
 def main() -> int:
     if not wait_server():
         _log("澜音还没启动，无法弹出控制台窗口")
         return 1
-    if focus_existing():
-        _log("已把现有控制台窗口放到前面")
-        return 0
-    browser = find_browser()
-    if browser is None:
-        _log("没有找到 Edge 或 Chrome，改用系统默认浏览器打开")
+    with _launch_lock():
+        if focus_existing():
+            _log("已把现有控制台窗口放到前面")
+            return 0
+        browser = find_browser()
+        if browser is None:
+            _log("没有找到 Edge 或 Chrome，改用系统默认浏览器打开")
+            if os.name == "nt":
+                os.startfile(URL)  # noqa: S606
+            else:
+                subprocess.Popen(["xdg-open", URL], close_fds=True)
+            return 0
+        if launch(browser):
+            return 0
+        _log("无法稳住独立窗口，改用系统默认浏览器打开")
         if os.name == "nt":
             os.startfile(URL)  # noqa: S606
         else:
             subprocess.Popen(["xdg-open", URL], close_fds=True)
         return 0
-    if launch(browser):
-        return 0
-    _log("无法稳住独立窗口，改用系统默认浏览器打开")
-    if os.name == "nt":
-        os.startfile(URL)  # noqa: S606
-    else:
-        subprocess.Popen(["xdg-open", URL], close_fds=True)
-    return 0
 
 
 if __name__ == "__main__":

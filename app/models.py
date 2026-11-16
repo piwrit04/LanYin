@@ -88,6 +88,37 @@ class QueueItem:
             "idle": bool(extra.get("idle")),
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "QueueItem":
+        raw = data or {}
+        extra = dict(raw.get("extra") or {})
+        if raw.get("idle") and not extra.get("idle"):
+            extra["idle"] = True
+        def _int(name: str, default: int = 0) -> int:
+            try:
+                return int(raw.get(name) if raw.get(name) is not None else default)
+            except (TypeError, ValueError):
+                return default
+        def _float(name: str, default: float = 0.0) -> float:
+            try:
+                return float(raw.get(name) if raw.get(name) is not None else default)
+            except (TypeError, ValueError):
+                return default
+        return cls(
+            id=str(raw.get("id") or ""),
+            title=str(raw.get("title") or ""),
+            artist=str(raw.get("artist") or ""),
+            source=str(raw.get("source") or ""),
+            source_id=str(raw.get("source_id") or ""),
+            duration=_int("duration"),
+            cover_url=str(raw.get("cover_url") or ""),
+            requester_uid=_int("requester_uid"),
+            requester_name=str(raw.get("requester_name") or ""),
+            query=str(raw.get("query") or ""),
+            added_at=_float("added_at"),
+            extra=extra,
+        )
+
 
 @dataclass
 class CurrentTrack:
