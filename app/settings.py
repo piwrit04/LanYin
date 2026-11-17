@@ -37,6 +37,11 @@ DEFAULT_OVERLAY: dict[str, Any] = {
     "width": 22.2,
     "height": 17.4,
     "show_lyrics": True,
+    "guide_enabled": True,
+    "guide_play_count": 1,
+    "guide_hide_delay_seconds": 3,
+    "guide_reappear_seconds": 90,
+    "guide_scroll_speed": 40,
 }
 
 DEFAULTS: dict[str, Any] = {
@@ -252,6 +257,9 @@ def _normalize_overlay(cfg: dict[str, Any]) -> dict[str, Any]:
         if right < 0:
             width = round(width + right, 1)
             right = 0.0
+    guide_enabled = raw.get("guide_enabled", DEFAULT_OVERLAY["guide_enabled"])
+    if isinstance(guide_enabled, str):
+        guide_enabled = guide_enabled.strip().lower() not in {"0", "false", "no", "off"}
     return {
         "top": top,
         "right": right,
@@ -260,6 +268,37 @@ def _normalize_overlay(cfg: dict[str, Any]) -> dict[str, Any]:
         "width": width,
         "height": height,
         "show_lyrics": bool(show),
+        "guide_enabled": bool(guide_enabled),
+        "guide_play_count": _clamp_int(
+            raw.get("guide_play_count", DEFAULT_OVERLAY["guide_play_count"]),
+            1,
+            20,
+            DEFAULT_OVERLAY["guide_play_count"],
+        ),
+        "guide_hide_delay_seconds": round(
+            _clamp_float(
+                raw.get("guide_hide_delay_seconds", DEFAULT_OVERLAY["guide_hide_delay_seconds"]),
+                0,
+                120,
+                DEFAULT_OVERLAY["guide_hide_delay_seconds"],
+            ),
+            1,
+        ),
+        "guide_reappear_seconds": round(
+            _clamp_float(
+                raw.get("guide_reappear_seconds", DEFAULT_OVERLAY["guide_reappear_seconds"]),
+                0,
+                1800,
+                DEFAULT_OVERLAY["guide_reappear_seconds"],
+            ),
+            1,
+        ),
+        "guide_scroll_speed": _clamp_int(
+            raw.get("guide_scroll_speed", DEFAULT_OVERLAY["guide_scroll_speed"]),
+            16,
+            120,
+            DEFAULT_OVERLAY["guide_scroll_speed"],
+        ),
     }
 
 

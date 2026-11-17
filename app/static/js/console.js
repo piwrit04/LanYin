@@ -971,6 +971,12 @@ function renderSettings() {
   });
   const lyrics = document.getElementById("ov-lyrics");
   if (lyrics && document.activeElement !== lyrics) lyrics.checked = ov.show_lyrics !== false;
+  const guideEnabled = document.getElementById("ov-guide-enabled");
+  if (guideEnabled && document.activeElement !== guideEnabled) guideEnabled.checked = ov.guide_enabled !== false;
+  const guidePlays = document.getElementById("ov-guide-plays");
+  if (guidePlays && document.activeElement !== guidePlays) guidePlays.value = ov.guide_play_count ?? 1;
+  const guideDelay = document.getElementById("ov-guide-delay");
+  if (guideDelay && document.activeElement !== guideDelay) guideDelay.value = ov.guide_hide_delay_seconds ?? 3;
   const pri = document.getElementById("priority-enabled");
   if (pri && document.activeElement !== pri) {
     pri.checked = ((s.priority_queue || {}).enabled !== false);
@@ -1009,11 +1015,27 @@ function readOverlayForm() {
     width: Math.round((100 - left - right) * 10) / 10,
     height: Math.round((100 - top - bottom) * 10) / 10,
     show_lyrics: lyrics ? !!lyrics.checked : true,
+    guide_enabled: document.getElementById("ov-guide-enabled")
+      ? !!document.getElementById("ov-guide-enabled").checked
+      : true,
+    guide_play_count: num("ov-guide-plays", 1),
+    guide_hide_delay_seconds: num("ov-guide-delay", 3),
   };
 }
 
 function applyOverlayPreview(pushSave) {
   const ov = readOverlayForm();
+  const stack = document.getElementById("preview-stack");
+  if (stack) stack.classList.toggle("guide-open", ov.guide_enabled !== false);
+  const playsField = document.getElementById("ov-guide-plays-field");
+  const delayField = document.getElementById("ov-guide-delay-field");
+  const disabled = ov.guide_enabled === false;
+  [playsField, delayField].forEach((el) => {
+    if (!el) return;
+    el.classList.toggle("is-disabled", disabled);
+    const input = el.querySelector("input");
+    if (input) input.disabled = disabled;
+  });
   const setVal = (id, n) => {
     const el = document.getElementById(id);
     if (el) el.textContent = Number(n).toFixed(1) + "%";
@@ -1457,6 +1479,11 @@ document.getElementById("welcome-enabled").addEventListener("change", () => {
 });
 const lyricsSw = document.getElementById("ov-lyrics");
 if (lyricsSw) lyricsSw.addEventListener("change", () => applyOverlayPreview(true));
+["ov-guide-enabled", "ov-guide-plays", "ov-guide-delay"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener(id === "ov-guide-enabled" ? "change" : "input", () => applyOverlayPreview(true));
+});
 document.querySelectorAll('input[name="timeout-action"]').forEach((el) => {
   el.addEventListener("change", () => {
     send({

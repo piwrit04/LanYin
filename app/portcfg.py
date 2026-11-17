@@ -22,7 +22,7 @@ def http_get(url: str, timeout: float = 1.5):
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 DEFAULT_PORT = 8765
-CONSOLE_VERSION = "45"  # 控制台静态资源版本，和 console.html 里的 ?v= 保持一致
+CONSOLE_VERSION = "46"  # 控制台静态资源版本，和 console.html 里的 ?v= 保持一致
 
 
 def _read_config_text(path: Path) -> str:

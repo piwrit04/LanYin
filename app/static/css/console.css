@@ -1571,9 +1571,74 @@ input.switch:focus { box-shadow: var(--focus-ring); }
 .preview-closeup {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent 40%), #0a0a0a;
   border: 1px solid var(--line); border-radius: 8px;
-  padding: 24px 16px; min-height: 240px;
+  padding: 48px 16px 24px; min-height: 260px;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden; min-width: 0; box-sizing: border-box;
+}
+.preview-stack {
+  --np-bg: rgba(20, 20, 20, 0.94);
+  --np-accent: #1668dc;
+  --np-text: #ffffff;
+  --np-muted: #b8bcc4;
+  --np-border: rgba(22, 104, 220, 0.35);
+  position: relative;
+  width: min(100%, 426px);
+}
+.preview-stack .guide-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: height 0.38s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+.preview-stack.guide-open .guide-slot { height: 30px; }
+.preview-stack .guide-bar {
+  height: 30px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  background: var(--np-bg);
+  border: 1px solid var(--np-border);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  color: var(--np-text);
+  overflow: hidden;
+}
+.preview-stack .guide-viewport {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+.preview-stack .guide-track {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  white-space: nowrap;
+}
+.preview-stack.guide-open .guide-track {
+  animation: preview-guide-scroll 18s linear infinite;
+}
+.preview-stack .guide-seq {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 30px;
+  padding: 0 12px;
+  color: var(--np-text);
+}
+.preview-stack .guide-gap { width: 48px; flex: none; }
+.preview-stack.guide-open .preview-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+@keyframes preview-guide-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 /* Preview card must keep the finished overlay look. Do not restyle typography/layout. */
 .preview-card {
@@ -1592,7 +1657,7 @@ input.switch:focus { box-shadow: var(--focus-ring); }
   right: auto;
   left: auto;
   bottom: auto;
-  width: min(100%, 426px);
+  width: 100%;
   height: 188px;
   background: var(--np-bg);
   border: 1px solid var(--np-border);

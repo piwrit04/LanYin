@@ -40,7 +40,7 @@ function syncLyricOrWave() {
 
 
 function applyOverlayGeometry() {
-  const card = document.getElementById("now-card");
+  const card = document.getElementById("now-stack") || document.getElementById("now-card");
   if (!card) return;
   const ov = overlaySettings();
   const num = (v) => {
@@ -133,6 +133,7 @@ function fmt(sec) {
 
 function render() {
   applyOverlayGeometry();
+  syncSongGuide();
   const cur = state.current;
   const waitingIdle = !cur && idleEnabled() && !(state.queue || []).length && !state.selection;
   const empty = !cur && !(state.queue || []).length && !state.selection && !waitingIdle;
@@ -269,14 +270,18 @@ function hslToRgb(h, s, l) {
   return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
 }
 
+function colorRoot() {
+  return document.getElementById("now-stack") || document.getElementById("now-card");
+}
+
 function clearCoverColors() {
-  const card = document.getElementById("now-card");
+  const card = colorRoot();
   if (!card) return;
   ["--np-bg", "--np-accent", "--np-text", "--np-muted", "--np-border"].forEach((k) => card.style.removeProperty(k));
 }
 
 function applyCoverColors(url) {
-  const card = document.getElementById("now-card");
+  const card = colorRoot();
   if (!card) return;
   if (!url) {
     lastCoverColorKey = "";
@@ -411,4 +416,167 @@ function showRequestToast(payload) {
     el.classList.remove("is-on");
     toastHideTimer = setTimeout(() => { el.hidden = true; }, 300);
   }, 4500);
+}
+
+
+
+const GUIDE_HTML = "弹幕点歌：<span class=\"g-cmd\">点歌 歌名 [歌手] [平台]</span><span class=\"g-sep\" aria-hidden=\"true\"></span>平台：<span class=\"g-plat\">B站/QQ/网易云/酷狗</span><span class=\"g-sep\" aria-hidden=\"true\"></span>例：<span class=\"g-eg\">点歌 晴天 周杰伦 B站</span>";
+const GUIDE_EXTEND_MS = 380;
+
+let guideTimer = 0;
+let guideKey = "";
+let guideRunning = false;
+
+function guideSettings() {
+  const ov = overlaySettings();
+  const plays = parseInt(ov.guide_play_count, 10);
+  const delay = Number(ov.guide_hide_delay_seconds);
+  const reappear = Number(ov.guide_reappear_seconds);
+  const speed = Number(ov.guide_scroll_speed);
+  return {
+    enabled: ov.guide_enabled !== false,
+    plays: Number.isFinite(plays) ? Math.max(1, Math.min(20, plays)) : 1,
+    hideDelay: Number.isFinite(delay) ? Math.max(0, delay) : 3,
+    reappear: Number.isFinite(reappear) ? Math.max(0, reappear) : 90,
+    speed: Number.isFinite(speed) ? Math.max(16, Math.min(120, speed)) : 40,
+  };
+}
+
+function clearGuideTimers() {
+  clearTimeout(guideTimer);
+  guideTimer = 0;
+}
+
+function setGuideOpen(open) {
+  const stack = document.getElementById("now-stack");
+  if (stack) stack.classList.toggle("guide-open", open);
+}
+
+function fillGuideText() {
+  const inner = document.getElementById("guide-seq");
+  const clone = document.getElementById("guide-seq-clone");
+  if (inner && inner.innerHTML !== GUIDE_HTML) inner.innerHTML = GUIDE_HTML;
+  if (clone && clone.innerHTML !== GUIDE_HTML) clone.innerHTML = GUIDE_HTML;
+}
+
+function measureGuideUnit() {
+  const track = document.getElementById("guide-track");
+  const unit = track && track.querySelector(".guide-unit");
+  if (unit && unit.offsetWidth) return unit.offsetWidth;
+  if (track && track.scrollWidth) return track.scrollWidth / 2;
+  return 0;
+}
+
+function resetGuideTrack() {
+  const track = document.getElementById("guide-track");
+  if (!track) return;
+  track.classList.remove("is-looping");
+  track.style.removeProperty("animation");
+  track.style.removeProperty("transition");
+  track.style.removeProperty("transform");
+  track.style.removeProperty("--guide-duration");
+}
+
+function syncSongGuide() {
+  const cfg = guideSettings();
+  const key = `${cfg.enabled}|${cfg.plays}|${cfg.hideDelay}|${cfg.reappear}|${cfg.speed}`;
+  const stack = document.getElementById("now-stack");
+  if (!stack) return;
+  if (!cfg.enabled) {
+    guideKey = key;
+    guideRunning = false;
+    clearGuideTimers();
+    setGuideOpen(false);
+    resetGuideTrack();
+    return;
+  }
+  fillGuideText();
+  if (key !== guideKey) {
+    guideKey = key;
+    clearGuideTimers();
+    guideRunning = false;
+    startGuideCycle();
+    return;
+  }
+  if (!guideRunning) startGuideCycle();
+}
+
+function startGuideCycle() {
+  if (guideRunning) return;
+  if (!guideSettings().enabled) return;
+  guideRunning = true;
+  fillGuideText();
+  resetGuideTrack();
+  setGuideOpen(true);
+  clearGuideTimers();
+  guideTimer = setTimeout(runGuideScroll, GUIDE_EXTEND_MS + 80);
+}
+
+
+function startGuideLoop(track, unit, speed) {
+  const apply = (width) => {
+    const duration = width > 0 ? width / (speed || 40) : 18;
+    track.classList.remove("is-looping");
+    track.style.removeProperty("animation");
+    track.style.removeProperty("transition");
+    track.style.removeProperty("transform");
+    track.style.setProperty("--guide-duration", duration + "s");
+    void track.offsetWidth;
+    track.classList.add("is-looping");
+  };
+  apply(unit);
+  if (unit <= 0) {
+    clearGuideTimers();
+    guideTimer = setTimeout(() => apply(measureGuideUnit()), 120);
+  }
+}
+
+function runGuideScroll() {
+  const cfg = guideSettings();
+  const track = document.getElementById("guide-track");
+  if (!track) {
+    retractGuide();
+    return;
+  }
+  const unit = measureGuideUnit();
+  const speed = cfg.speed;
+  if (cfg.reappear === 0) {
+    startGuideLoop(track, unit, speed);
+    return;
+  }
+  const view = track.parentElement ? track.parentElement.offsetWidth : 0;
+  const needScroll = unit > view + 8;
+  const distance = needScroll ? unit * cfg.plays : 0;
+  const duration = distance > 0 ? (distance / speed) * 1000 : 0;
+  if (distance > 0) {
+    resetGuideTrack();
+    void track.offsetWidth;
+    track.style.transition = `transform ${duration}ms linear`;
+    track.style.transform = `translateX(${-distance}px)`;
+  }
+  clearGuideTimers();
+  guideTimer = setTimeout(() => {
+    guideTimer = setTimeout(retractGuide, cfg.hideDelay * 1000);
+  }, duration);
+}
+
+function retractGuide() {
+  const cfg = guideSettings();
+  if (cfg.enabled && cfg.reappear === 0) return;
+  setGuideOpen(false);
+  clearGuideTimers();
+  guideTimer = setTimeout(() => {
+    resetGuideTrack();
+    guideRunning = false;
+    if (!guideSettings().enabled) return;
+    const wait = guideSettings().reappear * 1000;
+    if (wait <= 0) {
+      startGuideCycle();
+      return;
+    }
+    guideTimer = setTimeout(() => {
+      if (!guideSettings().enabled) return;
+      startGuideCycle();
+    }, wait);
+  }, GUIDE_EXTEND_MS + 40);
 }

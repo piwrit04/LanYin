@@ -4,11 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音覆盖层</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=31" />
-  <link rel="stylesheet" href="/static/css/overlay.css?v=31" />
+  <link rel="stylesheet" href="/static/css/common.css?v=35" />
+  <link rel="stylesheet" href="/static/css/overlay.css?v=35" />
 </head>
 <body>
   <div class="stage">
+    <div class="now-stack" id="now-stack">
+    <div class="guide-slot" id="guide-slot" aria-hidden="true">
+      <div class="guide-bar">
+        <div class="guide-viewport">
+          <div class="guide-track" id="guide-track">
+            <span class="guide-unit"><span class="guide-seq" id="guide-seq"></span><span class="guide-gap" aria-hidden="true"></span></span>
+            <span class="guide-unit" aria-hidden="true"><span class="guide-seq" id="guide-seq-clone"></span><span class="guide-gap"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
     <section class="now-card" id="now-card">
       <div class="cover-stage vinyl">
         <div class="vinyl-disc">
@@ -34,6 +45,7 @@
         </div>
       </div>
     </section>
+  </div>
     <section class="queue-card" id="queue-card">
       <h3>待播</h3>
       <ul id="queue"></ul>
@@ -49,7 +61,7 @@
       <ol id="sel-list"></ol>
     </section>
   </div>
-  <script src="/static/js/common.js?v=31"></script>
-  <script src="/static/js/overlay.js?v=31"></script>
+  <script src="/static/js/common.js?v=35"></script>
+  <script src="/static/js/overlay.js?v=35"></script>
 </body>
 </html>

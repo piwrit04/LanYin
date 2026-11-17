@@ -131,6 +131,11 @@ def test_old_config_merges_new_defaults(tmp_path, monkeypatch):
     cfg = settings.load_config()
     assert cfg["room_id"] == 42
     assert cfg["overlay"]["show_lyrics"] is True
+    assert cfg["overlay"]["guide_enabled"] is True
+    assert cfg["overlay"]["guide_play_count"] == 1
+    assert cfg["overlay"]["guide_hide_delay_seconds"] == 3
+    assert cfg["overlay"]["guide_reappear_seconds"] == 90
+    assert cfg["overlay"]["guide_scroll_speed"] == 40
     assert cfg["overlay"]["left"] == 6.7
     assert cfg["selection"]["timeout_action"] == "skip"
     assert cfg["messages"]["selection_timeout"] == "选歌超时已取消"
@@ -163,3 +168,54 @@ def test_old_width_height_keep_box_size(tmp_path, monkeypatch):
     assert cfg["overlay"]["height"] == 17.4
     assert cfg["overlay"]["top"] == 77.6
     assert cfg["overlay"]["right"] == 71.1
+
+
+def test_overlay_guide_defaults_and_roundtrip(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+
+    cfg = settings.load_config()
+    assert cfg["overlay"]["guide_enabled"] is True
+    assert cfg["overlay"]["guide_play_count"] == 1
+    assert cfg["overlay"]["guide_hide_delay_seconds"] == 3
+    assert cfg["overlay"]["guide_reappear_seconds"] == 90
+    assert cfg["overlay"]["guide_scroll_speed"] == 40
+
+    cfg["overlay"]["guide_enabled"] = False
+    cfg["overlay"]["guide_play_count"] = 4
+    cfg["overlay"]["guide_hide_delay_seconds"] = 2.5
+    cfg["overlay"]["guide_reappear_seconds"] = 0
+    cfg["overlay"]["guide_scroll_speed"] = 36
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["guide_enabled"] is False
+    assert again["overlay"]["guide_play_count"] == 4
+    assert again["overlay"]["guide_hide_delay_seconds"] == 2.5
+    assert again["overlay"]["guide_reappear_seconds"] == 0
+    assert again["overlay"]["guide_scroll_speed"] == 36
+
+
+def test_overlay_guide_values_are_clamped(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+    cfg = settings.load_config()
+    cfg["overlay"]["guide_enabled"] = "off"
+    cfg["overlay"]["guide_play_count"] = 99
+    cfg["overlay"]["guide_hide_delay_seconds"] = -2
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["guide_enabled"] is False
+    assert again["overlay"]["guide_play_count"] == 20
+    assert again["overlay"]["guide_hide_delay_seconds"] == 0
+
+    cfg = settings.load_config()
+    cfg["overlay"]["guide_play_count"] = 0
+    cfg["overlay"]["guide_hide_delay_seconds"] = 200
+    cfg["overlay"]["guide_reappear_seconds"] = 9999
+    cfg["overlay"]["guide_scroll_speed"] = 3
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["guide_play_count"] == 1
+    assert again["overlay"]["guide_hide_delay_seconds"] == 120
+    assert again["overlay"]["guide_reappear_seconds"] == 1800
+    assert again["overlay"]["guide_scroll_speed"] == 16

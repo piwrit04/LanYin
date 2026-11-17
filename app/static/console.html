@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音控制台</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=45" />
-  <link rel="stylesheet" href="/static/css/console.css?v=45" />
+  <link rel="stylesheet" href="/static/css/common.css?v=46" />
+  <link rel="stylesheet" href="/static/css/console.css?v=46" />
 </head>
 <body data-theme="plain">
   <div class="atmosphere" aria-hidden="true"></div>
@@ -225,7 +225,19 @@
         <div class="preview-closeup-wrap">
           <p class="field-label">样式预览（接近 1080p 实际大小）</p>
           <div class="preview-closeup" id="preview-closeup">
-            <div class="now-card preview-card" id="preview-card">
+            <div class="preview-stack" id="preview-stack">
+              <div class="guide-slot" aria-hidden="true">
+                <div class="guide-bar">
+                  <div class="guide-viewport">
+                    <div class="guide-track" id="preview-guide-track">
+                      <span class="guide-seq">弹幕点歌：点歌 歌名 [歌手] [平台]｜平台：B站/QQ/网易云/酷狗｜例：点歌 晴天 周杰伦 B站</span>
+                      <span class="guide-gap" aria-hidden="true"></span>
+                      <span class="guide-seq" aria-hidden="true">弹幕点歌：点歌 歌名 [歌手] [平台]｜平台：B站/QQ/网易云/酷狗｜例：点歌 晴天 周杰伦 B站</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="now-card preview-card" id="preview-card">
               <div class="cover" id="preview-cover"></div>
               <div class="now-body">
                 <div class="now-copy">
@@ -243,6 +255,7 @@
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -263,6 +276,16 @@
         <label class="switch-field">
           <span>显示歌词</span>
           <input type="checkbox" id="ov-lyrics" class="switch" checked />
+        </label>
+        <label class="switch-field">
+          <span>显示点歌提示条</span>
+          <input type="checkbox" id="ov-guide-enabled" class="switch" checked />
+        </label>
+        <label class="field" id="ov-guide-plays-field">每次出来播放次数
+          <input id="ov-guide-plays" type="number" min="1" max="20" step="1" value="1" />
+        </label>
+        <label class="field" id="ov-guide-delay-field">播放完间隔（秒）再收回
+          <input id="ov-guide-delay" type="number" min="0" max="120" step="0.5" value="3" />
         </label>
       </div>
     </div>
@@ -416,7 +439,7 @@
               <li>右侧打开「标头」（英文是 Headers），在「请求标头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
             </ol>
             <figure class="help-diagram">
-              <img src="/static/img/help/devtools-chromium.svg?v=45" alt="Edge / Chrome 开发者工具示意图：在网络面板选中一条请求，到请求标头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <img src="/static/img/help/devtools-chromium.svg?v=46" alt="Edge / Chrome 开发者工具示意图：在网络面板选中一条请求，到请求标头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
               <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
             </figure>
           </div>
@@ -429,7 +452,7 @@
               <li>右侧打开「标头」，在「请求头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
             </ol>
             <figure class="help-diagram">
-              <img src="/static/img/help/devtools-firefox.svg?v=45" alt="Firefox 开发者工具示意图：在网络面板选中一条请求，到请求头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <img src="/static/img/help/devtools-firefox.svg?v=46" alt="Firefox 开发者工具示意图：在网络面板选中一条请求，到请求头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
               <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
             </figure>
           </div>
@@ -459,7 +482,7 @@
   <audio id="console-audio" preload="auto"></audio>
   <!-- 全局提示：固定在窗口顶部居中，设置/登录页也能看到；最多 2 条，约 4.5 秒后自动消失。 -->
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
-  <script src="/static/js/common.js?v=45"></script>
-  <script src="/static/js/console.js?v=45"></script>
+  <script src="/static/js/common.js?v=46"></script>
+  <script src="/static/js/console.js?v=46"></script>
 </body>
 </html>

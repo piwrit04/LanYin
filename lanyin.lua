@@ -4,7 +4,7 @@ SOURCE_OVERLAY = "澜音覆盖层"
 SOURCE_AUDIO = "澜音音频"
 OLD_SOURCE_OVERLAY = "点歌姬覆盖层"
 OLD_SOURCE_AUDIO = "点歌姬音频"
-CONSOLE_VERSION = "45"
+CONSOLE_VERSION = "46"
 DEFAULT_PORT = 8765
 
 auto_start = true
