@@ -219,3 +219,46 @@ def test_overlay_guide_values_are_clamped(tmp_path, monkeypatch):
     assert again["overlay"]["guide_hide_delay_seconds"] == 120
     assert again["overlay"]["guide_reappear_seconds"] == 1800
     assert again["overlay"]["guide_scroll_speed"] == 16
+
+
+def test_overlay_size_change_keeps_position(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+    cfg = settings.load_config()
+    assert cfg["overlay"]["left"] == 6.7
+    assert cfg["overlay"]["bottom"] == 5.0
+    assert cfg["overlay"]["width"] == 22.2
+    assert cfg["overlay"]["height"] == 17.4
+    cfg["overlay"]["width"] = 30
+    cfg["overlay"]["height"] = 20
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["left"] == 6.7
+    assert again["overlay"]["bottom"] == 5.0
+    assert again["overlay"]["width"] == 30.0
+    assert again["overlay"]["height"] == 20.0
+    assert again["overlay"]["right"] == 63.3
+    assert again["overlay"]["top"] == 75.0
+
+
+def test_overlay_position_change_keeps_size(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+    cfg = settings.load_config()
+    cfg["overlay"]["left"] = 10
+    cfg["overlay"]["bottom"] = 8
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["left"] == 10.0
+    assert again["overlay"]["bottom"] == 8.0
+    assert again["overlay"]["width"] == 22.2
+    assert again["overlay"]["height"] == 17.4
+    assert again["overlay"]["right"] == 67.8
+    assert again["overlay"]["top"] == 74.6
+
+
+def test_overlay_default_size_and_position_values():
+    assert settings.DEFAULT_OVERLAY["width"] == 22.2
+    assert settings.DEFAULT_OVERLAY["height"] == 17.4
+    assert settings.DEFAULT_OVERLAY["left"] == 6.7
+    assert settings.DEFAULT_OVERLAY["bottom"] == 5.0

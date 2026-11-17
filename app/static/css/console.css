@@ -1515,6 +1515,9 @@ body.settings-open { overflow: hidden; }
 .badge.available { color: var(--ok-muted); border-color: var(--pill-on-border); background: var(--pill-on-bg); }
 .badge.needs_login { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 40%, var(--line)); background: color-mix(in srgb, var(--amber) 12%, transparent); }
 .badge.placeholder { color: var(--muted); }
+.overlay-section { margin-top: 20px; }
+.overlay-section .subhead { margin-bottom: 6px; }
+.overlay-section .hint { margin: 0 0 12px; }
 .overlay-controls {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1522,6 +1525,9 @@ body.settings-open { overflow: hidden; }
   margin-top: 12px;
   align-items: end;
 }
+.overlay-section .overlay-controls { margin-top: 0; }
+.overlay-reset { display: flex; align-items: end; min-height: 42px; }
+.overlay-reset button { width: 100%; }
 .slider-field strong { color: var(--text); font-weight: 600; margin-left: 8px; }
 .slider-field input[type="range"] { width: 100%; height: 18px; padding: 0; accent-color: var(--primary); }
 .switch-field {
@@ -1561,8 +1567,11 @@ input.switch:focus { box-shadow: var(--focus-ring); }
 }
 .preview-map-card {
   --ov-top: 77.6%; --ov-right: 71.1%; --ov-left: 6.7%; --ov-bottom: 5%;
+  --ov-width: 22.2%; --ov-height: 17.4%;
   position: absolute;
-  top: var(--ov-top); right: var(--ov-right); left: var(--ov-left); bottom: var(--ov-bottom);
+  top: auto; right: auto;
+  left: var(--ov-left); bottom: var(--ov-bottom);
+  width: var(--ov-width); height: var(--ov-height);
   background: rgba(20, 20, 20, 0.94);
   border: 1px solid rgba(22, 104, 220, 0.45);
   border-radius: 8px;

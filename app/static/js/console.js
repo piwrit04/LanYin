@@ -960,10 +960,10 @@ function renderSettings() {
   });
   const ov = s.overlay || {};
   const sliders = {
-    "ov-top": ov.top ?? 77.6,
-    "ov-bottom": ov.bottom ?? 5.0,
-    "ov-left": ov.left ?? 6.7,
-    "ov-right": ov.right ?? 71.1,
+    "ov-width": ov.width ?? DEFAULT_OVERLAY_BOX.width,
+    "ov-height": ov.height ?? DEFAULT_OVERLAY_BOX.height,
+    "ov-left": ov.left ?? DEFAULT_OVERLAY_BOX.left,
+    "ov-bottom": ov.bottom ?? DEFAULT_OVERLAY_BOX.bottom,
   };
   Object.keys(sliders).forEach((id) => {
     const el = document.getElementById(id);
@@ -984,36 +984,65 @@ function renderSettings() {
   applyOverlayPreview(false);
 }
 
-function fitInsets(a, b, minSize) {
-  a = Math.min(Math.max(a, 0), 100 - minSize);
-  b = Math.min(Math.max(b, 0), 100 - minSize);
-  const overflow = a + b - (100 - minSize);
-  if (overflow > 0) {
-    if (b >= a) b = Math.max(0, b - overflow);
-    else a = Math.max(0, a - overflow);
-  }
-  return [Math.round(a * 10) / 10, Math.round(b * 10) / 10];
+const DEFAULT_OVERLAY_BOX = { left: 6.7, bottom: 5.0, width: 22.2, height: 17.4 };
+
+function round1(n) {
+  return Math.round(Number(n) * 10) / 10;
 }
 
-function readOverlayForm() {
+function clampNum(n, lo, hi) {
+  return Math.min(Math.max(n, lo), hi);
+}
+
+/* mode "size"：尽量保持当前位置，只改宽高；放不下时再略微挪位置。
+   mode "pos"：尽量保持当前大小，只改位置。 */
+function overlayBoxFrom(left, bottom, width, height, mode) {
+  width = clampNum(width, 8, 80);
+  height = clampNum(height, 6, 60);
+  left = clampNum(left, 0, 92);
+  bottom = clampNum(bottom, 0, 92);
+  if (mode === "size") {
+    if (left + width > 100) width = 100 - left;
+    if (bottom + height > 100) height = 100 - bottom;
+    width = Math.max(width, 8);
+    height = Math.max(height, 6);
+    if (left + width > 100) left = Math.max(0, 100 - width);
+    if (bottom + height > 100) bottom = Math.max(0, 100 - height);
+  } else {
+    if (left + width > 100) left = 100 - width;
+    if (bottom + height > 100) bottom = 100 - height;
+    left = Math.max(0, left);
+    bottom = Math.max(0, bottom);
+  }
+  left = round1(left);
+  bottom = round1(bottom);
+  width = round1(width);
+  height = round1(height);
+  return {
+    left,
+    bottom,
+    width,
+    height,
+    top: round1(100 - bottom - height),
+    right: round1(100 - left - width),
+  };
+}
+
+function readOverlayForm(mode) {
   const num = (id, fallback) => {
     const n = Number(document.getElementById(id) && document.getElementById(id).value);
     return Number.isFinite(n) ? n : fallback;
   };
   const lyrics = document.getElementById("ov-lyrics");
-  let left = num("ov-left", 6.7);
-  let right = num("ov-right", 71.1);
-  let top = num("ov-top", 77.6);
-  let bottom = num("ov-bottom", 5.0);
-  [left, right] = fitInsets(left, right, 8);
-  [top, bottom] = fitInsets(top, bottom, 6);
+  const box = overlayBoxFrom(
+    num("ov-left", DEFAULT_OVERLAY_BOX.left),
+    num("ov-bottom", DEFAULT_OVERLAY_BOX.bottom),
+    num("ov-width", DEFAULT_OVERLAY_BOX.width),
+    num("ov-height", DEFAULT_OVERLAY_BOX.height),
+    mode || "pos",
+  );
   return {
-    top,
-    right,
-    left,
-    bottom,
-    width: Math.round((100 - left - right) * 10) / 10,
-    height: Math.round((100 - top - bottom) * 10) / 10,
+    ...box,
     show_lyrics: lyrics ? !!lyrics.checked : true,
     guide_enabled: document.getElementById("ov-guide-enabled")
       ? !!document.getElementById("ov-guide-enabled").checked
@@ -1023,8 +1052,19 @@ function readOverlayForm() {
   };
 }
 
-function applyOverlayPreview(pushSave) {
-  const ov = readOverlayForm();
+function writeOverlayBoxToForm(box) {
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  };
+  set("ov-left", box.left);
+  set("ov-bottom", box.bottom);
+  set("ov-width", box.width);
+  set("ov-height", box.height);
+}
+
+function applyOverlayPreview(pushSave, mode) {
+  const ov = readOverlayForm(mode);
   const stack = document.getElementById("preview-stack");
   if (stack) stack.classList.toggle("guide-open", ov.guide_enabled !== false);
   const playsField = document.getElementById("ov-guide-plays-field");
@@ -1040,10 +1080,10 @@ function applyOverlayPreview(pushSave) {
     const el = document.getElementById(id);
     if (el) el.textContent = Number(n).toFixed(1) + "%";
   };
-  setVal("ov-top-val", ov.top);
-  setVal("ov-bottom-val", ov.bottom);
+  setVal("ov-width-val", ov.width);
+  setVal("ov-height-val", ov.height);
   setVal("ov-left-val", ov.left);
-  setVal("ov-right-val", ov.right);
+  setVal("ov-bottom-val", ov.bottom);
   const card = document.getElementById("preview-card");
   if (card) {
     card.classList.toggle("hide-lyrics", !ov.show_lyrics);
@@ -1051,10 +1091,12 @@ function applyOverlayPreview(pushSave) {
   }
   const map = document.getElementById("preview-map-card");
   if (map) {
-    map.style.setProperty("--ov-top", ov.top + "%");
-    map.style.setProperty("--ov-right", ov.right + "%");
     map.style.setProperty("--ov-left", ov.left + "%");
     map.style.setProperty("--ov-bottom", ov.bottom + "%");
+    map.style.setProperty("--ov-width", ov.width + "%");
+    map.style.setProperty("--ov-height", ov.height + "%");
+    map.style.setProperty("--ov-top", ov.top + "%");
+    map.style.setProperty("--ov-right", ov.right + "%");
   }
   const lyric = document.getElementById("preview-lyric");
   if (lyric) lyric.hidden = !ov.show_lyrics;
@@ -1472,11 +1514,34 @@ document.getElementById("welcome-enabled").addEventListener("change", () => {
     settings: { welcome: { enabled: document.getElementById("welcome-enabled").checked } },
   });
 });
-["ov-top", "ov-bottom", "ov-left", "ov-right"].forEach((id) => {
+["ov-width", "ov-height"].forEach((id) => {
   const el = document.getElementById(id);
   if (!el) return;
-  el.addEventListener("input", () => applyOverlayPreview(true));
+  el.addEventListener("input", () => applyOverlayPreview(true, "size"));
 });
+["ov-left", "ov-bottom"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("input", () => applyOverlayPreview(true, "pos"));
+});
+const btnResetSize = document.getElementById("btn-ov-reset-size");
+if (btnResetSize) {
+  btnResetSize.addEventListener("click", () => {
+    const cur = readOverlayForm("keep");
+    const box = overlayBoxFrom(cur.left, cur.bottom, DEFAULT_OVERLAY_BOX.width, DEFAULT_OVERLAY_BOX.height, "size");
+    writeOverlayBoxToForm(box);
+    applyOverlayPreview(true, "size");
+  });
+}
+const btnResetPos = document.getElementById("btn-ov-reset-pos");
+if (btnResetPos) {
+  btnResetPos.addEventListener("click", () => {
+    const cur = readOverlayForm("keep");
+    const box = overlayBoxFrom(DEFAULT_OVERLAY_BOX.left, DEFAULT_OVERLAY_BOX.bottom, cur.width, cur.height, "pos");
+    writeOverlayBoxToForm(box);
+    applyOverlayPreview(true, "pos");
+  });
+}
 const lyricsSw = document.getElementById("ov-lyrics");
 if (lyricsSw) lyricsSw.addEventListener("change", () => applyOverlayPreview(true));
 ["ov-guide-enabled", "ov-guide-plays", "ov-guide-delay"].forEach((id) => {
