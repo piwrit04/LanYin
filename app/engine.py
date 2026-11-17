@@ -1469,6 +1469,11 @@ class SongEngine:
         self._persist_config()
         await self.push_state()
 
+    def _current_volume(self) -> float:
+        from app.settings import normalize_volume
+        cfg = getattr(self.app, "config", None) or {}
+        return normalize_volume(cfg)
+
     async def _begin_playback(
         self, item: QueueItem, playable: Playable, *, position: float = 0, paused: bool = False
     ) -> None:
@@ -1493,6 +1498,7 @@ class SongEngine:
             "stream_url": f"/api/stream/{item.id}",
             "lyric": lyric,
             "paused": bool(paused),
+            "volume": self._current_volume(),
         }
         if pos > 0.2:
             cmd["position"] = pos

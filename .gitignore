@@ -23,3 +23,6 @@ logs/
 
 data/playback.json
 data/console-window.lock
+
+# OBS 内置插件单独发，不随主仓库提交
+obs-plugin/

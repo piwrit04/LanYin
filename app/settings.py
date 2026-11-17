@@ -29,6 +29,30 @@ DEFAULT_MESSAGES: dict[str, str] = {
     "blacklisted_song": "这首歌已拉黑",
 }
 
+DEFAULT_STYLE_CLASSIC: dict[str, Any] = {
+    "left": 6.7,
+    "bottom": 5.0,
+    "width": 22.2,
+    "height": 17.4,
+    "show_lyrics": True,
+    "guide_enabled": True,
+    "guide_play_count": 1,
+    "guide_hide_delay_seconds": 3,
+    "guide_reappear_seconds": 90,
+    "guide_scroll_speed": 40,
+}
+
+DEFAULT_STYLE_PORTRAIT: dict[str, Any] = {
+    "left": 2.2,
+    "bottom": 3.1,
+    "width": 14.5,
+    "height": 32.2,
+    "show_lyrics": True,
+    "carousel_seconds": 6,
+    "show_date": True,
+    "show_time": True,
+}
+
 DEFAULT_OVERLAY: dict[str, Any] = {
     "top": 77.6,
     "right": 71.1,
@@ -42,6 +66,14 @@ DEFAULT_OVERLAY: dict[str, Any] = {
     "guide_hide_delay_seconds": 3,
     "guide_reappear_seconds": 90,
     "guide_scroll_speed": 40,
+    "style": "classic",
+    "carousel_seconds": 6,
+    "show_date": True,
+    "show_time": True,
+    "styles": {
+        "classic": dict(DEFAULT_STYLE_CLASSIC),
+        "portrait": dict(DEFAULT_STYLE_PORTRAIT),
+    },
 }
 
 DEFAULTS: dict[str, Any] = {
@@ -77,6 +109,7 @@ DEFAULTS: dict[str, Any] = {
     "console_theme": DEFAULT_THEME,
     "priority_queue": {"enabled": True},
     "blacklist": {"users": [], "songs": []},
+    "volume": 0.8,
 }
 
 VALID_SOURCES = ["qq", "qishui", "kugou", "bili", "netease"]
@@ -91,6 +124,11 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+def normalize_volume(cfg: Any, default: float = 0.8) -> float:
+    raw = cfg.get("volume") if isinstance(cfg, dict) else cfg
+    return _clamp_float(raw, 0.0, 1.0, default)
 
 
 def _clamp_float(value: Any, lo: float, hi: float, default: float) -> float:
@@ -215,6 +253,62 @@ def _fit_insets(a: float, b: float, min_size: float) -> tuple[float, float]:
     return round(a, 1), round(b, 1)
 
 
+
+def _as_bool(value: Any, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off", ""}
+    return bool(value)
+
+
+def _normalize_box(raw: dict[str, Any], default: dict[str, Any]) -> dict[str, Any]:
+    """Normalize left/bottom/width/height (and matching top/right) for one overlay style."""
+    d = default
+    has_insets = ("top" in raw) or ("right" in raw)
+    has_size = ("width" in raw) or ("height" in raw)
+    use_insets = has_insets
+    if has_insets and has_size:
+        left_tmp = _clamp_float(raw.get("left", d["left"]), 0, 100, d["left"])
+        right_tmp = _clamp_float(raw.get("right", d.get("right", round(100 - d["left"] - d["width"], 1))), 0, 100, d.get("right", 71.1))
+        top_tmp = _clamp_float(raw.get("top", d.get("top", round(100 - d["bottom"] - d["height"], 1))), 0, 100, d.get("top", 77.6))
+        bottom_tmp = _clamp_float(raw.get("bottom", d["bottom"]), 0, 100, d["bottom"])
+        width_tmp = _clamp_float(raw.get("width", d["width"]), 8, 80, d["width"])
+        height_tmp = _clamp_float(raw.get("height", d["height"]), 6, 60, d["height"])
+        if abs((left_tmp + right_tmp + width_tmp) - 100) > 0.15 or abs((top_tmp + bottom_tmp + height_tmp) - 100) > 0.15:
+            use_insets = False
+    if use_insets:
+        left = _clamp_float(raw.get("left", d["left"]), 0, 100, d["left"])
+        right = _clamp_float(raw.get("right", d.get("right", round(100 - d["left"] - d["width"], 1))), 0, 100, d.get("right", 71.1))
+        top = _clamp_float(raw.get("top", d.get("top", round(100 - d["bottom"] - d["height"], 1))), 0, 100, d.get("top", 77.6))
+        bottom = _clamp_float(raw.get("bottom", d["bottom"]), 0, 100, d["bottom"])
+        left, right = _fit_insets(left, right, 8.0)
+        top, bottom = _fit_insets(top, bottom, 6.0)
+        width = round(100.0 - left - right, 1)
+        height = round(100.0 - top - bottom, 1)
+    else:
+        left = round(_clamp_float(raw.get("left", d["left"]), 0, 80, d["left"]), 1)
+        bottom = round(_clamp_float(raw.get("bottom", d["bottom"]), 0, 80, d["bottom"]), 1)
+        width = round(_clamp_float(raw.get("width", d["width"]), 8, 80, d["width"]), 1)
+        height = round(_clamp_float(raw.get("height", d["height"]), 6, 60, d["height"]), 1)
+        top = round(100.0 - bottom - height, 1)
+        right = round(100.0 - left - width, 1)
+        if top < 0:
+            height = round(height + top, 1)
+            top = 0.0
+        if right < 0:
+            width = round(width + right, 1)
+            right = 0.0
+    return {
+        "left": left,
+        "bottom": bottom,
+        "width": width,
+        "height": height,
+        "top": top,
+        "right": right,
+    }
+
+
 def _normalize_overlay(cfg: dict[str, Any]) -> dict[str, Any]:
     raw = cfg.get("overlay") if isinstance(cfg.get("overlay"), dict) else {}
     show = raw.get("show_lyrics", True)
@@ -260,45 +354,137 @@ def _normalize_overlay(cfg: dict[str, Any]) -> dict[str, Any]:
     guide_enabled = raw.get("guide_enabled", DEFAULT_OVERLAY["guide_enabled"])
     if isinstance(guide_enabled, str):
         guide_enabled = guide_enabled.strip().lower() not in {"0", "false", "no", "off"}
-    return {
-        "top": top,
-        "right": right,
-        "left": left,
-        "bottom": bottom,
-        "width": width,
-        "height": height,
-        "show_lyrics": bool(show),
-        "guide_enabled": bool(guide_enabled),
+    style = str(raw.get("style") or "classic").strip().lower()
+    if style not in {"classic", "portrait"}:
+        style = "classic"
+    styles_raw = raw.get("styles") if isinstance(raw.get("styles"), dict) else {}
+    classic_raw = styles_raw.get("classic") if isinstance(styles_raw.get("classic"), dict) else {}
+    portrait_raw = styles_raw.get("portrait") if isinstance(styles_raw.get("portrait"), dict) else {}
+    # Old configs have no styles.classic: keep the top-level box as the classic card.
+    if not classic_raw:
+        classic_raw = {
+            "left": left,
+            "bottom": bottom,
+            "width": width,
+            "height": height,
+            "top": top,
+            "right": right,
+            "show_lyrics": bool(show),
+            "guide_enabled": bool(guide_enabled),
+            "guide_play_count": raw.get("guide_play_count", DEFAULT_OVERLAY["guide_play_count"]),
+            "guide_hide_delay_seconds": raw.get("guide_hide_delay_seconds", DEFAULT_OVERLAY["guide_hide_delay_seconds"]),
+            "guide_reappear_seconds": raw.get("guide_reappear_seconds", DEFAULT_OVERLAY["guide_reappear_seconds"]),
+            "guide_scroll_speed": raw.get("guide_scroll_speed", DEFAULT_OVERLAY["guide_scroll_speed"]),
+        }
+    classic_box = _normalize_box(classic_raw, DEFAULT_STYLE_CLASSIC)
+    classic = {
+        **classic_box,
+        "show_lyrics": _as_bool(classic_raw.get("show_lyrics", show), True),
+        "guide_enabled": _as_bool(classic_raw.get("guide_enabled", guide_enabled), True),
         "guide_play_count": _clamp_int(
-            raw.get("guide_play_count", DEFAULT_OVERLAY["guide_play_count"]),
-            1,
-            20,
-            DEFAULT_OVERLAY["guide_play_count"],
+            classic_raw.get("guide_play_count", raw.get("guide_play_count", DEFAULT_OVERLAY["guide_play_count"])),
+            1, 20, DEFAULT_OVERLAY["guide_play_count"],
         ),
         "guide_hide_delay_seconds": round(
             _clamp_float(
-                raw.get("guide_hide_delay_seconds", DEFAULT_OVERLAY["guide_hide_delay_seconds"]),
-                0,
-                120,
-                DEFAULT_OVERLAY["guide_hide_delay_seconds"],
+                classic_raw.get("guide_hide_delay_seconds", raw.get("guide_hide_delay_seconds", DEFAULT_OVERLAY["guide_hide_delay_seconds"])),
+                0, 120, DEFAULT_OVERLAY["guide_hide_delay_seconds"],
             ),
             1,
         ),
         "guide_reappear_seconds": round(
             _clamp_float(
-                raw.get("guide_reappear_seconds", DEFAULT_OVERLAY["guide_reappear_seconds"]),
-                0,
-                1800,
-                DEFAULT_OVERLAY["guide_reappear_seconds"],
+                classic_raw.get("guide_reappear_seconds", raw.get("guide_reappear_seconds", DEFAULT_OVERLAY["guide_reappear_seconds"])),
+                0, 1800, DEFAULT_OVERLAY["guide_reappear_seconds"],
             ),
             1,
         ),
         "guide_scroll_speed": _clamp_int(
-            raw.get("guide_scroll_speed", DEFAULT_OVERLAY["guide_scroll_speed"]),
-            16,
-            120,
-            DEFAULT_OVERLAY["guide_scroll_speed"],
+            classic_raw.get("guide_scroll_speed", raw.get("guide_scroll_speed", DEFAULT_OVERLAY["guide_scroll_speed"])),
+            16, 120, DEFAULT_OVERLAY["guide_scroll_speed"],
         ),
+    }
+    if not portrait_raw:
+        portrait_raw = dict(DEFAULT_STYLE_PORTRAIT)
+        # Allow top-level portrait-only keys to seed a first-time portrait style.
+        for key in ("carousel_seconds", "show_date", "show_time", "show_lyrics"):
+            if key in raw:
+                portrait_raw[key] = raw[key]
+    portrait_box = _normalize_box(portrait_raw, DEFAULT_STYLE_PORTRAIT)
+    portrait = {
+        **portrait_box,
+        "show_lyrics": _as_bool(portrait_raw.get("show_lyrics", True), True),
+        "carousel_seconds": round(
+            _clamp_float(portrait_raw.get("carousel_seconds", raw.get("carousel_seconds", 6)), 2, 30, 6),
+            1,
+        ),
+        "show_date": _as_bool(portrait_raw.get("show_date", raw.get("show_date", True)), True),
+        "show_time": _as_bool(portrait_raw.get("show_time", raw.get("show_time", True)), True),
+    }
+
+    def _box_close(a: dict[str, Any], b: dict[str, Any]) -> bool:
+        return all(abs(float(a[k]) - float(b[k])) <= 0.15 for k in ("left", "bottom", "width", "height"))
+
+    # After a first save, overlay always has styles.* plus a flattened top-level box.
+    # Older console writes and tests often mutate only the flattened keys; treat those
+    # as an edit of the active style, unless they are clearly the other style's leftover box.
+    active = classic if style == "classic" else portrait
+    other = portrait if style == "classic" else classic
+    top_box = _normalize_box(raw, active)
+    if not _box_close(top_box, active) and not _box_close(top_box, other):
+        if style == "classic":
+            classic = {**classic, **top_box}
+            active = classic
+        else:
+            portrait = {**portrait, **top_box}
+            active = portrait
+    if "show_lyrics" in raw:
+        top_show = _as_bool(raw.get("show_lyrics"), True)
+        if top_show != active["show_lyrics"] and top_show != other.get("show_lyrics"):
+            active["show_lyrics"] = top_show
+    # Guide settings live on classic, but are also flattened at the top level.
+    if "guide_enabled" in raw:
+        classic["guide_enabled"] = _as_bool(raw.get("guide_enabled"), True)
+    if "guide_play_count" in raw:
+        classic["guide_play_count"] = _clamp_int(raw.get("guide_play_count"), 1, 20, DEFAULT_OVERLAY["guide_play_count"])
+    if "guide_hide_delay_seconds" in raw:
+        classic["guide_hide_delay_seconds"] = round(
+            _clamp_float(raw.get("guide_hide_delay_seconds"), 0, 120, DEFAULT_OVERLAY["guide_hide_delay_seconds"]),
+            1,
+        )
+    if "guide_reappear_seconds" in raw:
+        classic["guide_reappear_seconds"] = round(
+            _clamp_float(raw.get("guide_reappear_seconds"), 0, 1800, DEFAULT_OVERLAY["guide_reappear_seconds"]),
+            1,
+        )
+    if "guide_scroll_speed" in raw:
+        classic["guide_scroll_speed"] = _clamp_int(
+            raw.get("guide_scroll_speed"), 16, 120, DEFAULT_OVERLAY["guide_scroll_speed"],
+        )
+    if "carousel_seconds" in raw:
+        portrait["carousel_seconds"] = round(_clamp_float(raw.get("carousel_seconds"), 2, 30, 6), 1)
+    if "show_date" in raw:
+        portrait["show_date"] = _as_bool(raw.get("show_date"), True)
+    if "show_time" in raw:
+        portrait["show_time"] = _as_bool(raw.get("show_time"), True)
+    return {
+        "style": style,
+        "styles": {"classic": classic, "portrait": portrait},
+        "top": active["top"],
+        "right": active["right"],
+        "left": active["left"],
+        "bottom": active["bottom"],
+        "width": active["width"],
+        "height": active["height"],
+        "show_lyrics": active["show_lyrics"],
+        "guide_enabled": classic["guide_enabled"],
+        "guide_play_count": classic["guide_play_count"],
+        "guide_hide_delay_seconds": classic["guide_hide_delay_seconds"],
+        "guide_reappear_seconds": classic["guide_reappear_seconds"],
+        "guide_scroll_speed": classic["guide_scroll_speed"],
+        "carousel_seconds": portrait["carousel_seconds"],
+        "show_date": portrait["show_date"],
+        "show_time": portrait["show_time"],
     }
 
 
@@ -357,6 +543,7 @@ def load_config() -> dict[str, Any]:
     cfg["console_theme"] = _normalize_theme(cfg)
     cfg["priority_queue"] = normalize_priority_queue(cfg)
     cfg["blacklist"] = normalize_blacklist(cfg)
+    cfg["volume"] = normalize_volume(cfg)
     if first_run and not CONFIG_PATH.exists():
         # 第一次运行：写一份默认 config.yaml（只在文件不存在时写，绝不覆盖已有配置）
         try:
@@ -388,6 +575,7 @@ def save_config(cfg: dict[str, Any]) -> None:
         "console_theme": _normalize_theme(cfg),
         "priority_queue": normalize_priority_queue(cfg),
         "blacklist": normalize_blacklist(cfg),
+        "volume": normalize_volume(cfg),
     }
     CONFIG_PATH.write_text(
         yaml.safe_dump(clean, allow_unicode=True, sort_keys=False),

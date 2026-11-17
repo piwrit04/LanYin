@@ -18,6 +18,7 @@ let currentAudioId = "";
 let idleBusy = false;
 let lyricLines = [];
 let overlaySaveTimer = null;
+let overlayDirty = false;
 
 function loadVolume() {
   const raw = localStorage.getItem(VOLUME_KEY);
@@ -25,8 +26,11 @@ function loadVolume() {
   return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.8;
 }
 
-function applyVolume(v) {
+let lastSentVolume = null;
+
+function applyVolume(v, sync) {
   const vol = Math.min(1, Math.max(0, Number(v)));
+  if (!Number.isFinite(vol)) return;
   if (audio) audio.volume = vol;
   localStorage.setItem(VOLUME_KEY, String(vol));
   const slider = document.getElementById("volume");
@@ -38,6 +42,26 @@ function applyVolume(v) {
     icon.classList.remove("vol-high", "vol-low", "vol-mute");
     icon.classList.add(vol <= 0.001 ? "vol-mute" : vol < 0.4 ? "vol-low" : "vol-high");
   }
+  if (sync !== false && ws && ws.readyState === 1 && (lastSentVolume === null || Math.abs(vol - lastSentVolume) >= 0.005)) {
+    lastSentVolume = vol;
+    ws.send(JSON.stringify({ type: "volume", volume: vol }));
+  }
+}
+
+function applyVolumeFromServer(v) {
+  const vol = Math.min(1, Math.max(0, Number(v)));
+  if (!Number.isFinite(vol)) return;
+  lastSentVolume = vol;
+  applyVolume(vol, false);
+}
+
+function volumeFromState(payload) {
+  if (!payload) return null;
+  if (payload.volume != null && payload.volume !== "") return Number(payload.volume);
+  if (payload.settings && payload.settings.volume != null && payload.settings.volume !== "") {
+    return Number(payload.settings.volume);
+  }
+  return null;
 }
 
 function setPlayButton(paused, disabled) {
@@ -71,8 +95,13 @@ function applyOutputMute() {
 }
 
 function handlePlayerCmd(msg) {
+  if (msg.action === "volume") {
+    applyVolumeFromServer(msg.volume);
+    return;
+  }
   if (!audio) return;
   applyOutputMute();
+  if (msg.volume != null) applyVolumeFromServer(msg.volume);
   if (usingExternalPlayer()) {
     audio.pause();
     return;
@@ -136,6 +165,11 @@ function connect() {
     if (msg.type === "state") {
       state = msg.payload;
       noteNewLogs(state.logs || [], true);
+      const remoteVol = volumeFromState(state);
+      if (remoteVol != null && Number.isFinite(remoteVol)) {
+        const slider = document.getElementById("volume");
+        if (!slider || document.activeElement !== slider) applyVolumeFromServer(remoteVol);
+      }
       applyOutputMute();
       render();
     } else if (msg.type === "log") {
@@ -959,24 +993,15 @@ function renderSettings() {
     if (document.activeElement !== el) el.checked = el.value === action;
   });
   const ov = s.overlay || {};
-  const sliders = {
-    "ov-width": ov.width ?? DEFAULT_OVERLAY_BOX.width,
-    "ov-height": ov.height ?? DEFAULT_OVERLAY_BOX.height,
-    "ov-left": ov.left ?? DEFAULT_OVERLAY_BOX.left,
-    "ov-bottom": ov.bottom ?? DEFAULT_OVERLAY_BOX.bottom,
-  };
-  Object.keys(sliders).forEach((id) => {
-    const el = document.getElementById(id);
-    if (el && document.activeElement !== el) el.value = sliders[id];
-  });
-  const lyrics = document.getElementById("ov-lyrics");
-  if (lyrics && document.activeElement !== lyrics) lyrics.checked = ov.show_lyrics !== false;
-  const guideEnabled = document.getElementById("ov-guide-enabled");
-  if (guideEnabled && document.activeElement !== guideEnabled) guideEnabled.checked = ov.guide_enabled !== false;
-  const guidePlays = document.getElementById("ov-guide-plays");
-  if (guidePlays && document.activeElement !== guidePlays) guidePlays.value = ov.guide_play_count ?? 1;
-  const guideDelay = document.getElementById("ov-guide-delay");
-  if (guideDelay && document.activeElement !== guideDelay) guideDelay.value = ov.guide_hide_delay_seconds ?? 3;
+  if (!overlayDirty) {
+    ingestOverlayStyles(ov);
+    const style = ov.style === "portrait" ? "portrait" : "classic";
+    const styleRadio = document.querySelector('input[name="ov-style"][value="' + style + '"]');
+    const styleBusy = document.activeElement && document.activeElement.closest && document.activeElement.closest("#ov-style");
+    if (styleRadio && !styleBusy) styleRadio.checked = true;
+    lastOverlayStyle = currentOverlayStyle();
+    writeStyleToForm(lastOverlayStyle);
+  }
   const pri = document.getElementById("priority-enabled");
   if (pri && document.activeElement !== pri) {
     pri.checked = ((s.priority_queue || {}).enabled !== false);
@@ -984,7 +1009,122 @@ function renderSettings() {
   applyOverlayPreview(false);
 }
 
-const DEFAULT_OVERLAY_BOX = { left: 6.7, bottom: 5.0, width: 22.2, height: 17.4 };
+const DEFAULT_STYLE_BOX = {
+  classic: { left: 6.7, bottom: 5.0, width: 22.2, height: 17.4 },
+  portrait: { left: 2.2, bottom: 3.1, width: 14.5, height: 32.2 },
+};
+const DEFAULT_OVERLAY_BOX = DEFAULT_STYLE_BOX.classic;
+let lastOverlayStyle = "classic";
+
+function defaultStyleRecord(style) {
+  if (style === "portrait") {
+    return { ...DEFAULT_STYLE_BOX.portrait, show_lyrics: true, carousel_seconds: 6, show_date: true, show_time: true };
+  }
+  return { ...DEFAULT_STYLE_BOX.classic, show_lyrics: true, guide_enabled: true, guide_play_count: 1, guide_hide_delay_seconds: 3 };
+}
+
+let overlayStylesCache = {
+  classic: defaultStyleRecord("classic"),
+  portrait: defaultStyleRecord("portrait"),
+};
+
+function currentOverlayStyle() {
+  const el = document.querySelector('input[name="ov-style"]:checked');
+  return el && el.value === "portrait" ? "portrait" : "classic";
+}
+
+function defaultBoxFor(style) {
+  return DEFAULT_STYLE_BOX[style] || DEFAULT_STYLE_BOX.classic;
+}
+
+function ingestOverlayStyles(ov) {
+  if (!ov) return;
+  const classic = defaultStyleRecord("classic");
+  const portrait = defaultStyleRecord("portrait");
+  if (ov.styles && ov.styles.classic) Object.assign(classic, ov.styles.classic);
+  else {
+    ["left", "bottom", "width", "height", "top", "right", "show_lyrics", "guide_enabled", "guide_play_count", "guide_hide_delay_seconds"].forEach((k) => {
+      if (ov[k] !== undefined) classic[k] = ov[k];
+    });
+  }
+  if (ov.styles && ov.styles.portrait) Object.assign(portrait, ov.styles.portrait);
+  ["carousel_seconds", "show_date", "show_time"].forEach((k) => {
+    if (ov[k] !== undefined && !(ov.styles && ov.styles.portrait && ov.styles.portrait[k] !== undefined)) {
+      portrait[k] = ov[k];
+    }
+  });
+  overlayStylesCache = { classic, portrait };
+}
+
+function writeStyleToForm(style) {
+  const rec = overlayStylesCache[style] || defaultStyleRecord(style);
+  const skip = (el) => el && document.activeElement === el;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && !skip(el)) el.value = value;
+  };
+  const setCheck = (id, on) => {
+    const el = document.getElementById(id);
+    if (el && !skip(el)) el.checked = !!on;
+  };
+  set("ov-left", rec.left);
+  set("ov-bottom", rec.bottom);
+  set("ov-width", rec.width);
+  set("ov-height", rec.height);
+  setCheck("ov-lyrics", rec.show_lyrics !== false);
+  setCheck("ov-guide-enabled", (overlayStylesCache.classic.guide_enabled !== false));
+  set("ov-guide-plays", overlayStylesCache.classic.guide_play_count ?? 1);
+  set("ov-guide-delay", overlayStylesCache.classic.guide_hide_delay_seconds ?? 3);
+  set("ov-carousel", rec.carousel_seconds ?? overlayStylesCache.portrait.carousel_seconds ?? 6);
+  setCheck("ov-show-date", overlayStylesCache.portrait.show_date !== false);
+  setCheck("ov-show-time", overlayStylesCache.portrait.show_time !== false);
+}
+
+function syncOverlayStyleFields() {
+  const style = currentOverlayStyle();
+  const classicFields = document.getElementById("ov-classic-fields");
+  const portraitFields = document.getElementById("ov-portrait-fields");
+  if (classicFields) classicFields.hidden = style !== "classic";
+  if (portraitFields) portraitFields.hidden = style !== "portrait";
+  const stack = document.getElementById("preview-stack");
+  const closeup = document.getElementById("preview-closeup");
+  if (stack) stack.classList.toggle("is-portrait", style === "portrait");
+  if (closeup) closeup.classList.toggle("is-portrait", style === "portrait");
+}
+
+function captureFormIntoCache(style, mode) {
+  const num = (id, fallback) => {
+    const n = Number(document.getElementById(id) && document.getElementById(id).value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const def = defaultBoxFor(style);
+  const box = overlayBoxFrom(
+    num("ov-left", def.left),
+    num("ov-bottom", def.bottom),
+    num("ov-width", def.width),
+    num("ov-height", def.height),
+    mode || "pos",
+  );
+  const lyrics = document.getElementById("ov-lyrics");
+  const rec = { ...(overlayStylesCache[style] || defaultStyleRecord(style)), ...box, show_lyrics: lyrics ? !!lyrics.checked : true };
+  if (style === "classic") {
+    rec.guide_enabled = document.getElementById("ov-guide-enabled")
+      ? !!document.getElementById("ov-guide-enabled").checked
+      : rec.guide_enabled !== false;
+    rec.guide_play_count = num("ov-guide-plays", rec.guide_play_count ?? 1);
+    rec.guide_hide_delay_seconds = num("ov-guide-delay", rec.guide_hide_delay_seconds ?? 3);
+  } else {
+    rec.carousel_seconds = num("ov-carousel", rec.carousel_seconds ?? 6);
+    rec.show_date = document.getElementById("ov-show-date")
+      ? !!document.getElementById("ov-show-date").checked
+      : rec.show_date !== false;
+    rec.show_time = document.getElementById("ov-show-time")
+      ? !!document.getElementById("ov-show-time").checked
+      : rec.show_time !== false;
+  }
+  overlayStylesCache[style] = rec;
+  return rec;
+}
 
 function round1(n) {
   return Math.round(Number(n) * 10) / 10;
@@ -1029,26 +1169,36 @@ function overlayBoxFrom(left, bottom, width, height, mode) {
 }
 
 function readOverlayForm(mode) {
+  const style = currentOverlayStyle();
   const num = (id, fallback) => {
     const n = Number(document.getElementById(id) && document.getElementById(id).value);
     return Number.isFinite(n) ? n : fallback;
   };
   const lyrics = document.getElementById("ov-lyrics");
+  const def = defaultBoxFor(style);
   const box = overlayBoxFrom(
-    num("ov-left", DEFAULT_OVERLAY_BOX.left),
-    num("ov-bottom", DEFAULT_OVERLAY_BOX.bottom),
-    num("ov-width", DEFAULT_OVERLAY_BOX.width),
-    num("ov-height", DEFAULT_OVERLAY_BOX.height),
+    num("ov-left", def.left),
+    num("ov-bottom", def.bottom),
+    num("ov-width", def.width),
+    num("ov-height", def.height),
     mode || "pos",
   );
+  const showLyrics = lyrics ? !!lyrics.checked : true;
+  captureFormIntoCache(style, mode);
+  const classic = overlayStylesCache.classic;
+  const portrait = overlayStylesCache.portrait;
+  const active = style === "portrait" ? portrait : classic;
   return {
+    style,
+    styles: { classic, portrait },
     ...box,
-    show_lyrics: lyrics ? !!lyrics.checked : true,
-    guide_enabled: document.getElementById("ov-guide-enabled")
-      ? !!document.getElementById("ov-guide-enabled").checked
-      : true,
-    guide_play_count: num("ov-guide-plays", 1),
-    guide_hide_delay_seconds: num("ov-guide-delay", 3),
+    show_lyrics: showLyrics,
+    guide_enabled: classic.guide_enabled !== false,
+    guide_play_count: classic.guide_play_count ?? 1,
+    guide_hide_delay_seconds: classic.guide_hide_delay_seconds ?? 3,
+    carousel_seconds: portrait.carousel_seconds ?? 6,
+    show_date: portrait.show_date !== false,
+    show_time: portrait.show_time !== false,
   };
 }
 
@@ -1065,8 +1215,13 @@ function writeOverlayBoxToForm(box) {
 
 function applyOverlayPreview(pushSave, mode) {
   const ov = readOverlayForm(mode);
+  syncOverlayStyleFields();
   const stack = document.getElementById("preview-stack");
-  if (stack) stack.classList.toggle("guide-open", ov.guide_enabled !== false);
+  if (stack) {
+    stack.classList.toggle("guide-open", ov.style !== "portrait" && ov.guide_enabled !== false);
+  }
+  const carVal = document.getElementById("ov-carousel-val");
+  if (carVal) carVal.textContent = (ov.carousel_seconds ?? 6) + " 秒";
   const playsField = document.getElementById("ov-guide-plays-field");
   const delayField = document.getElementById("ov-guide-delay-field");
   const disabled = ov.guide_enabled === false;
@@ -1121,14 +1276,116 @@ function applyOverlayPreview(pushSave, mode) {
     if (nextEl) { nextEl.textContent = "下一首：七里香 - 周杰伦"; nextEl.hidden = false; }
     if (lyric && ov.show_lyrics) lyric.textContent = "表层的抚慰 禁不起咀嚼";
   }
-  if (pushSave) scheduleOverlaySave();
+  if (window.PortraitCard) {
+    const preview = document.getElementById("preview-portrait");
+    if (preview && PortraitCard.root !== preview) PortraitCard.init(preview);
+    PortraitCard.applySettings(ov);
+    const demo = cur || {
+      title: "夜曲 · 超长歌名滚动预览示例",
+      artist: "周杰伦",
+      source: "qq",
+      requester_name: "小明",
+      lyric_line: "表层的抚慰 禁不起咀嚼",
+    };
+    PortraitCard.renderTrack(demo, {
+      paused: !!(state.current && state.current.paused),
+      coverSrc: (u) => (u && typeof coverSrc === "function") ? coverSrc(u) : (u || ""),
+      position: state.current ? Number(state.current.position) || 0 : 0,
+      duration: state.current ? Number(state.current.duration) || 0 : 0,
+    });
+    if (!state.current) {
+      // keep a demo track in the preview so the card is not stuck on the idle tip
+      PortraitCard.setPlaying(true);
+    }
+    tintPreviewFromCover(state.current && (state.current.cover_url || state.current.cover_data));
+  }
+  if (pushSave) overlayDirty = true;
+}
+
+function tintPreviewFromCover(url) {
+  const stack = document.getElementById("preview-stack");
+  const card = document.getElementById("preview-portrait");
+  const targets = [stack, card].filter(Boolean);
+  if (!targets.length) return;
+  const clear = () => {
+    ["--np-bg", "--np-accent", "--np-text", "--np-muted", "--np-border"].forEach((k) => {
+      targets.forEach((el) => el.style.removeProperty(k));
+    });
+  };
+  if (!url) { clear(); return; }
+  const src = (typeof coverSrc === "function") ? coverSrc(url) : url;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    try {
+      const c = document.createElement("canvas");
+      c.width = 32; c.height = 32;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, 32, 32);
+      const data = ctx.getImageData(0, 0, 32, 32).data;
+      const buckets = new Map();
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 128) continue;
+        const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const l = (max + min) / 2;
+        if (l < 0.08 || l > 0.95) continue;
+        const d = max - min;
+        let h = 0, s = 0;
+        if (d) {
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+          else if (max === g) h = (b - r) / d + 2;
+          else h = (r - g) / d + 4;
+          h /= 6;
+        }
+        if (s < 0.12) continue;
+        const key = Math.round(h * 24);
+        const prev = buckets.get(key) || { w: 0, h: 0, s: 0 };
+        const w = s * s;
+        buckets.set(key, { w: prev.w + w, h: prev.h + h * w, s: prev.s + s * w });
+      }
+      let top = null;
+      buckets.forEach((v) => { if (!top || v.w > top.w) top = v; });
+      const h = top ? top.h / top.w : 0.05;
+      const s = top ? Math.min(0.75, Math.max(0.35, top.s / top.w)) : 0.55;
+      const rgb = (hh, ss, ll) => {
+        const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss;
+        const p = 2 * ll - q;
+        const hue = (t) => {
+          if (t < 0) t += 1; if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+        return [hue(hh + 1 / 3), hue(hh), hue(hh - 1 / 3)].map((v) => Math.round(v * 255));
+      };
+      const bg = rgb(h, Math.min(0.5, s * 0.85), 0.16);
+      const accent = rgb(h, Math.min(0.9, s * 1.15), 0.62);
+      const muted = rgb(h, Math.min(0.25, s * 0.35), 0.72);
+      targets.forEach((el) => {
+        el.style.setProperty("--np-bg", `rgba(${bg[0]}, ${bg[1]}, ${bg[2]}, 0.94)`);
+        el.style.setProperty("--np-accent", `rgb(${accent[0]}, ${accent[1]}, ${accent[2]})`);
+        el.style.setProperty("--np-text", "#ffffff");
+        el.style.setProperty("--np-muted", `rgb(${muted[0]}, ${muted[1]}, ${muted[2]})`);
+        el.style.setProperty("--np-border", `rgba(${accent[0]}, ${accent[1]}, ${accent[2]}, 0.35)`);
+      });
+    } catch (e) { clear(); }
+  };
+  img.onerror = clear;
+  img.src = src;
 }
 
 function scheduleOverlaySave() {
-  clearTimeout(overlaySaveTimer);
-  overlaySaveTimer = setTimeout(() => {
-    send({ type: "command", action: "update_settings", settings: { overlay: readOverlayForm() } });
-  }, 200);
+  // 播放器样式改为手动点「保存设置」，不再自动保存。
+  overlayDirty = true;
+}
+
+async function saveOverlaySettings() {
+  const payload = { type: "command", action: "update_settings", settings: { overlay: readOverlayForm() } };
+  await sendAndAck(payload);
+  overlayDirty = false;
 }
 
 function optionalNumber(id) {
@@ -1483,6 +1740,18 @@ document.getElementById("now-progress").addEventListener("click", (e) => {
     try { audio.currentTime = t; } catch (err) {}
   }
 });
+const btnSaveOverlay = document.getElementById("btn-save-overlay");
+if (btnSaveOverlay) {
+  btnSaveOverlay.onclick = async () => {
+    try {
+      await saveOverlaySettings();
+      showToast("设置已保存", "播放器样式已更新到覆盖层", "success");
+    } catch (err) {
+      if (/超时/.test(String((err && err.message) || ""))) lastSaveTimeoutAt = Date.now();
+      showToast("设置保存失败", (err && err.message) || "请稍后重试", "error");
+    }
+  };
+}
 const btnSave = document.getElementById("btn-save");
 if (btnSave) {
   btnSave.onclick = async () => {
@@ -1528,7 +1797,8 @@ const btnResetSize = document.getElementById("btn-ov-reset-size");
 if (btnResetSize) {
   btnResetSize.addEventListener("click", () => {
     const cur = readOverlayForm("keep");
-    const box = overlayBoxFrom(cur.left, cur.bottom, DEFAULT_OVERLAY_BOX.width, DEFAULT_OVERLAY_BOX.height, "size");
+    const def = defaultBoxFor(currentOverlayStyle());
+    const box = overlayBoxFrom(cur.left, cur.bottom, def.width, def.height, "size");
     writeOverlayBoxToForm(box);
     applyOverlayPreview(true, "size");
   });
@@ -1537,7 +1807,8 @@ const btnResetPos = document.getElementById("btn-ov-reset-pos");
 if (btnResetPos) {
   btnResetPos.addEventListener("click", () => {
     const cur = readOverlayForm("keep");
-    const box = overlayBoxFrom(DEFAULT_OVERLAY_BOX.left, DEFAULT_OVERLAY_BOX.bottom, cur.width, cur.height, "pos");
+    const def = defaultBoxFor(currentOverlayStyle());
+    const box = overlayBoxFrom(def.left, def.bottom, cur.width, cur.height, "pos");
     writeOverlayBoxToForm(box);
     applyOverlayPreview(true, "pos");
   });
@@ -1549,6 +1820,24 @@ if (lyricsSw) lyricsSw.addEventListener("change", () => applyOverlayPreview(true
   if (!el) return;
   el.addEventListener(id === "ov-guide-enabled" ? "change" : "input", () => applyOverlayPreview(true));
 });
+document.querySelectorAll('input[name="ov-style"]').forEach((el) => {
+  el.addEventListener("change", () => {
+    const next = el.value === "portrait" ? "portrait" : "classic";
+    if (next !== lastOverlayStyle) {
+      captureFormIntoCache(lastOverlayStyle);
+      lastOverlayStyle = next;
+      writeStyleToForm(next);
+    }
+    applyOverlayPreview(true);
+  });
+});
+const carousel = document.getElementById("ov-carousel");
+if (carousel) carousel.addEventListener("input", () => applyOverlayPreview(true));
+["ov-show-date", "ov-show-time"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("change", () => applyOverlayPreview(true));
+});
+if (window.PortraitCard) PortraitCard.init(document.getElementById("preview-portrait"));
 document.querySelectorAll('input[name="timeout-action"]').forEach((el) => {
   el.addEventListener("change", () => {
     send({

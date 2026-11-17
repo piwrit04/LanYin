@@ -2235,3 +2235,14 @@ body.is-standalone .settings-drawer {
 .volume-ctl input[type="range"]::-moz-range-track { background: color-mix(in srgb, var(--text) 14%, transparent); }
 /* 关着的设置抽屉多推出去一点，阴影不再在页面右边缘露出一条灰边。 */
 .settings-drawer:not(.is-open) { transform: translateX(calc(100% + 48px)); }
+
+
+.ov-style-pick { margin: 0 0 14px; }
+.preview-closeup.is-portrait {
+  min-height: 460px;
+  padding: 28px 16px;
+}
+.preview-stack.is-portrait {
+  width: 278px;
+  height: 348px;
+}

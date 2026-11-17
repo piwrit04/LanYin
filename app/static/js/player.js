@@ -22,6 +22,9 @@ function connect() {
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "player_cmd") handleCmd(msg);
+    else if (msg.type === "state" && msg.payload && msg.payload.volume != null) {
+      applyVolume(msg.payload.volume, false);
+    }
   };
   ws.onclose = () => setTimeout(connect, 1500);
 }
@@ -33,6 +36,11 @@ function sendPlayer(payload) {
 }
 
 function handleCmd(msg) {
+  if (msg.action === "volume") {
+    applyVolume(msg.volume, false);
+    return;
+  }
+  if (msg.volume != null) applyVolume(msg.volume, false);
   if (msg.action === "play") {
     const item = msg.item || {};
     currentId = item.id;
@@ -127,21 +135,31 @@ document.getElementById("btn-pause").onclick = () => {
 };
 
 const VOLUME_KEY = "obs-song-volume";
-(function initVolume() {
+let lastSentVolume = null;
+
+function applyVolume(v, sync) {
+  const vol = Math.min(1, Math.max(0, Number(v)));
+  if (!Number.isFinite(vol)) return;
+  audio.volume = vol;
+  localStorage.setItem(VOLUME_KEY, String(vol));
   const slider = document.getElementById("volume");
   const label = document.getElementById("volume-val");
-  const stored = Number(localStorage.getItem(VOLUME_KEY));
-  const vol = Number.isFinite(stored) ? Math.min(1, Math.max(0, stored)) : 0.8;
-  audio.volume = vol;
-  if (slider) slider.value = String(Math.round(vol * 100));
+  if (slider && document.activeElement !== slider) slider.value = String(Math.round(vol * 100));
   if (label) label.textContent = Math.round(vol * 100) + "%";
+  if (sync !== false && ws && ws.readyState === 1 && (lastSentVolume === null || Math.abs(vol - lastSentVolume) >= 0.005)) {
+    lastSentVolume = vol;
+    ws.send(JSON.stringify({ type: "volume", volume: vol }));
+  } else if (sync === false) {
+    lastSentVolume = vol;
+  }
+}
+
+(function initVolume() {
+  const slider = document.getElementById("volume");
+  const stored = Number(localStorage.getItem(VOLUME_KEY));
+  applyVolume(Number.isFinite(stored) ? stored : 0.8, false);
   if (slider) {
-    slider.addEventListener("input", () => {
-      const v = Number(slider.value) / 100;
-      audio.volume = v;
-      localStorage.setItem(VOLUME_KEY, String(v));
-      if (label) label.textContent = Math.round(v * 100) + "%";
-    });
+    slider.addEventListener("input", () => applyVolume(Number(slider.value) / 100));
   }
 })();
 

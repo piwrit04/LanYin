@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
@@ -18,7 +19,7 @@ from app.engine import SongEngine
 from app.hub import Hub
 from app.http_util import DEFAULT_UA
 from app.secrets_store import get_platform, set_platform
-from app.settings import DATA_DIR, ensure_dirs, load_config, save_config
+from app.settings import DATA_DIR, ensure_dirs, load_config, normalize_volume, save_config
 from app.sources.registry import all_adapters
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -61,13 +62,46 @@ class AppState:
                 "console_theme": self.config.get("console_theme") or "plain",
                 "priority_queue": dict(self.config.get("priority_queue") or {"enabled": True}),
                 "blacklist": dict(self.config.get("blacklist") or {"users": [], "songs": []}),
+                "volume": normalize_volume(self.config),
             },
+            "volume": normalize_volume(self.config),
             "next": self.engine.peek_next() if getattr(self, "engine", None) else None,
             "version": __version__,
         }
 
 
 state = AppState()
+_volume_save_task: asyncio.Task | None = None
+
+
+def current_volume() -> float:
+    return normalize_volume(state.config)
+
+
+async def handle_volume(data: dict[str, Any]) -> None:
+    """控制台音量条直接改「澜音音频」播放页音量，监听和直播一起变。"""
+    global _volume_save_task
+    vol = normalize_volume(data.get("volume"))
+    state.config["volume"] = vol
+    await state.hub.broadcast({"type": "player_cmd", "action": "volume", "volume": vol})
+
+    async def _save() -> None:
+        await asyncio.sleep(0.4)
+        try:
+            save_config(state.config)
+        except Exception:
+            pass
+
+    if _volume_save_task and not _volume_save_task.done():
+        _volume_save_task.cancel()
+    try:
+        _volume_save_task = asyncio.get_running_loop().create_task(_save())
+    except RuntimeError:
+        try:
+            save_config(state.config)
+        except Exception:
+            pass
+
 
 
 def _on_danmaku_status(level: str, message: str) -> None:
@@ -150,6 +184,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="澜音", version=__version__, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 NO_STORE_HEADERS = {"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"}
 
 
@@ -221,6 +262,7 @@ async def ws_endpoint(ws: WebSocket):
                                 "lyric": cur.lyric or "",
                                 "position": cur.position,
                                 "paused": cur.paused,
+                                "volume": current_volume(),
                             }
                         )
                 await ws.send_json({"type": "state", "payload": state.hub.snapshot(state.public_extra())})
@@ -228,6 +270,8 @@ async def ws_endpoint(ws: WebSocket):
                 await handle_command(data, ws)
             elif typ == "player":
                 await handle_player_event(data)
+            elif typ == "volume":
+                await handle_volume(data)
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -869,7 +913,7 @@ async def cover_proxy(u: str):
     return StreamingResponse(
         iter([resp.content]),
         media_type=media,
-        headers={"cache-control": "public, max-age=86400"},
+        headers={"cache-control": "public, max-age=86400", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET"},
     )
 
 

@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音控制台</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=47" />
-  <link rel="stylesheet" href="/static/css/console.css?v=47" />
+  <link rel="stylesheet" href="/static/css/common.css?v=56" />
+  <link rel="stylesheet" href="/static/css/console.css?v=56" />
+  <link rel="stylesheet" href="/static/css/portrait-card.css?v=56" />
 </head>
 <body data-theme="plain">
   <div class="atmosphere" aria-hidden="true"></div>
@@ -214,7 +215,11 @@
     </div>
 
     <div class="tab-pane is-active" data-pane="overlay">
-      <p class="hint">OBS 浏览器源请铺满整个画布。设置分成两块：上面只改播放卡片的大小，下面只改它在覆盖层画面里的位置，互不影响。</p>
+      <p class="hint">OBS 浏览器源请铺满整个画布。播放器有两种样式：经典版和竖卡。点歌提示条只是经典版里的开关，不是单独一种样式。两种样式的大小、位置和其他选项分开保存。在这里调整只先看预览，点下面的「保存设置」后，覆盖层才会跟着变。</p>
+      <div class="segmented ov-style-pick" id="ov-style" role="radiogroup">
+        <label><input type="radio" name="ov-style" value="classic" checked /> 经典版</label>
+        <label><input type="radio" name="ov-style" value="portrait" /> 竖卡</label>
+      </div>
       <div class="preview-board">
         <div class="preview-map-wrap">
           <p class="field-label">在画面中的位置</p>
@@ -256,13 +261,45 @@
                 </div>
               </div>
             </div>
+            <article class="portrait-card is-idle" id="preview-portrait">
+              <p class="clock">
+                <span class="clock-date">1月1日 星期一</span>
+                <span class="clock-time">00:00:00</span>
+              </p>
+              <div class="hero">
+                <section class="slide cover" data-slide="cover">
+                  <div class="cover-img" id="preview-portrait-cover"></div>
+                </section>
+                <section class="slide guide is-active" data-slide="guide">
+                  <p class="guide-kicker">弹幕点歌</p>
+                  <p class="guide-cmd">点歌 <em>歌名</em> [歌手] [平台]</p>
+                  <p class="guide-plat">B站 / QQ / 网易云 / 酷狗</p>
+                  <p class="guide-eg">例：<strong>点歌 晴天 周杰伦 B站</strong></p>
+                </section>
+              </div>
+              <div class="dots"><span></span><span class="is-on"></span></div>
+              <div class="lyric-slot">
+                <p class="lyric is-empty" id="portrait-lyric">还没有正在播放的歌曲</p>
+                <canvas class="wave" id="portrait-wave" hidden width="256" height="26"></canvas>
+              </div>
+              <div class="bar-row">
+                <span id="portrait-t0">00:00</span>
+                <div class="bar"><span id="portrait-bar"></span></div>
+                <span id="portrait-t1">00:00</span>
+              </div>
+              <div class="meta">
+                <p class="kicker" id="portrait-kicker">等待点歌</p>
+                <p class="title is-wrap" id="portrait-title"><span class="title-text">等待点歌</span></p>
+                <p class="sub" id="portrait-sub">澜音</p>
+              </div>
+            </article>
             </div>
           </div>
         </div>
       </div>
       <div class="overlay-section">
         <h3 class="subhead">播放卡片大小</h3>
-        <p class="hint">只改变卡片有多宽、多高，不会移动它在画面上的位置。默认大小是宽 22.2%、高 17.4%。</p>
+        <p class="hint">只改变当前样式的卡片有多宽、多高，不会移动位置，也不会改到另一种样式。经典版默认宽 22.2%、高 17.4%；竖卡默认宽 14.5%、高 32.2%。</p>
         <div class="overlay-controls">
           <label class="field slider-field">宽度 <strong id="ov-width-val">22.2%</strong>
             <input id="ov-width" type="range" min="8" max="80" step="0.1" value="22.2" />
@@ -277,7 +314,7 @@
       </div>
       <div class="overlay-section">
         <h3 class="subhead">播放器位置</h3>
-        <p class="hint">只改变播放卡片在覆盖层画面里离左边和底边的距离，不会改变卡片大小。默认位置是距左 6.7%、距下 5.0%。</p>
+        <p class="hint">只改变当前样式在画面里离左边和底边的距离，不会改变大小，也不会改到另一种样式。经典版默认距左 6.7%、距下 5.0%；竖卡默认距左 2.2%、距下 3.1%。</p>
         <div class="overlay-controls">
           <label class="field slider-field">距左边 <strong id="ov-left-val">6.7%</strong>
             <input id="ov-left" type="range" min="0" max="92" step="0.1" value="6.7" />
@@ -297,6 +334,8 @@
             <span>显示歌词</span>
             <input type="checkbox" id="ov-lyrics" class="switch" checked />
           </label>
+        </div>
+        <div class="overlay-controls" id="ov-classic-fields">
           <label class="switch-field">
             <span>显示点歌提示条</span>
             <input type="checkbox" id="ov-guide-enabled" class="switch" checked />
@@ -308,6 +347,22 @@
             <input id="ov-guide-delay" type="number" min="0" max="120" step="0.5" value="3" />
           </label>
         </div>
+        <div class="overlay-controls" id="ov-portrait-fields" hidden>
+          <label class="field slider-field">轮播切换速度 <strong id="ov-carousel-val">6 秒</strong>
+            <input id="ov-carousel" type="range" min="2" max="20" step="0.5" value="6" />
+          </label>
+          <label class="switch-field">
+            <span>显示日期</span>
+            <input type="checkbox" id="ov-show-date" class="switch" checked />
+          </label>
+          <label class="switch-field">
+            <span>显示时间</span>
+            <input type="checkbox" id="ov-show-time" class="switch" checked />
+          </label>
+        </div>
+      </div>
+      <div class="pane-actions">
+        <button class="primary" id="btn-save-overlay" type="button">保存设置</button>
       </div>
     </div>
 
@@ -460,7 +515,7 @@
               <li>右侧打开「标头」（英文是 Headers），在「请求标头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
             </ol>
             <figure class="help-diagram">
-              <img src="/static/img/help/devtools-chromium.svg?v=47" alt="Edge / Chrome 开发者工具示意图：在网络面板选中一条请求，到请求标头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <img src="/static/img/help/devtools-chromium.svg?v=56" alt="Edge / Chrome 开发者工具示意图：在网络面板选中一条请求，到请求标头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
               <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
             </figure>
           </div>
@@ -473,7 +528,7 @@
               <li>右侧打开「标头」，在「请求头」里找到 <code>Cookie</code>，复制上面需要的值。</li>
             </ol>
             <figure class="help-diagram">
-              <img src="/static/img/help/devtools-firefox.svg?v=47" alt="Firefox 开发者工具示意图：在网络面板选中一条请求，到请求头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
+              <img src="/static/img/help/devtools-firefox.svg?v=56" alt="Firefox 开发者工具示意图：在网络面板选中一条请求，到请求头里复制 Cookie。图中是打码示例，不要使用图上的值。" width="640" height="300" />
               <figcaption>示意图（Cookie 已打码，请复制你自己网页里的值）</figcaption>
             </figure>
           </div>
@@ -503,7 +558,8 @@
   <audio id="console-audio" preload="auto"></audio>
   <!-- 全局提示：固定在窗口顶部居中，设置/登录页也能看到；最多 2 条，约 4.5 秒后自动消失。 -->
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
-  <script src="/static/js/common.js?v=47"></script>
-  <script src="/static/js/console.js?v=47"></script>
+  <script src="/static/js/common.js?v=56"></script>
+  <script src="/static/js/portrait-card.js?v=56"></script>
+  <script src="/static/js/console.js?v=56"></script>
 </body>
 </html>

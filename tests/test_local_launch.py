@@ -246,10 +246,10 @@ def test_launcher_files_static():
     assert "start_win.py" in bat and (REPO / "start_win.py").exists()
     assert "bind_to_obs.py" in (REPO / "bind_to_obs.bat").read_text()
     lua = (REPO / "lanyin.lua").read_text(encoding="utf-8")
-    assert 'CONSOLE_VERSION = "45"' in lua
+    assert 'CONSOLE_VERSION = "56"' in lua
     from app.portcfg import CONSOLE_VERSION
 
-    assert CONSOLE_VERSION == "45"
+    assert CONSOLE_VERSION == "56"
     html = (REPO / "app/static/console.html").read_text(encoding="utf-8")
     assert f"console.css?v={CONSOLE_VERSION}" in html and f"console.js?v={CONSOLE_VERSION}" in html
 

@@ -20,8 +20,34 @@ function overlaySettings() {
   return (state.settings && state.settings.overlay) || {};
 }
 
+function overlayStyle() {
+  const params = new URLSearchParams(location.search);
+  const mode = params.get("style") || params.get("mode");
+  if (mode === "portrait" || mode === "card") return "portrait";
+  if (mode === "bar") return "bar";
+  return overlaySettings().style === "portrait" ? "portrait" : "classic";
+}
+
+function activeOverlay() {
+  const ov = overlaySettings();
+  const style = overlayStyle();
+  const boxed = (ov.styles && style !== "bar" && ov.styles[style]) || {};
+  return Object.assign({}, ov, boxed, { style: style });
+}
+
 function showLyricsEnabled() {
-  return overlaySettings().show_lyrics !== false;
+  return activeOverlay().show_lyrics !== false;
+}
+
+function applyOverlayStyle() {
+  const style = overlayStyle();
+  document.body.classList.toggle("style-portrait", style === "portrait");
+  if (style === "bar" || compact) document.body.classList.add("compact");
+  else document.body.classList.remove("compact");
+  if (window.PortraitCard) {
+    if (!PortraitCard.root) PortraitCard.init(document.getElementById("portrait-card"));
+    if (style === "portrait") PortraitCard.applySettings(activeOverlay());
+  }
 }
 
 
@@ -42,7 +68,7 @@ function syncLyricOrWave() {
 function applyOverlayGeometry() {
   const card = document.getElementById("now-stack") || document.getElementById("now-card");
   if (!card) return;
-  const ov = overlaySettings();
+  const ov = activeOverlay();
   const num = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : NaN;
@@ -133,7 +159,9 @@ function fmt(sec) {
 
 function render() {
   applyOverlayGeometry();
-  syncSongGuide();
+  applyOverlayStyle();
+  if (overlayStyle() === "portrait") setGuideOpen(false);
+  else syncSongGuide();
   const cur = state.current;
   const waitingIdle = !cur && idleEnabled() && !(state.queue || []).length && !state.selection;
   const empty = !cur && !(state.queue || []).length && !state.selection && !waitingIdle;
@@ -154,7 +182,7 @@ function render() {
     artist.textContent = [cur.artist || "", src, who].filter(Boolean).join(" · ");
     meta.textContent = [SOURCE_LABEL[cur.source] || cur.source, who].filter(Boolean).join("  ·  ");
     setCover(cover, cur.cover_url);
-    applyCoverColors(cur.cover_url);
+    applyCoverColors(cur.cover_url || cur.cover_data || "");
     cover.classList.toggle("is-playing", !cur.paused);
     setVinylSpin(cover, !cur.paused);
     card.classList.add("is-playing");
@@ -209,6 +237,14 @@ function render() {
   }
   syncLyricOrWave();
   updateProgress();
+  if (window.PortraitCard && overlayStyle() === "portrait") {
+    PortraitCard.renderTrack(cur, {
+      paused: !!(cur && cur.paused),
+      coverSrc: (u) => u ? coverSrc(u) : "",
+      position: cur ? Number(cur.position) || 0 : 0,
+      duration: cur ? Number(cur.duration) || 0 : 0,
+    });
+  }
 }
 
 
@@ -216,9 +252,18 @@ function updateProgress() {
   const cur = state.current;
   const dur = (cur && (cur.duration || 0)) || 0;
   const pos = (cur && (cur.position || 0)) || 0;
-  document.getElementById("bar").style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : "0%";
-  document.getElementById("t0").textContent = fmt(pos);
-  document.getElementById("t1").textContent = fmt(dur);
+  const bar = document.getElementById("bar");
+  const t0 = document.getElementById("t0");
+  const t1 = document.getElementById("t1");
+  if (bar) bar.style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : "0%";
+  if (t0) t0.textContent = fmt(pos);
+  if (t1) t1.textContent = fmt(dur);
+  if (window.PortraitCard && overlayStyle() === "portrait") {
+    PortraitCard.renderProgress(pos, dur);
+    PortraitCard.renderLyricAt(pos, cur || null);
+    const card = document.getElementById("portrait-card");
+    if (card) card.classList.toggle("is-paused", !!(cur && cur.paused));
+  }
 }
 
 function esc(s) {
@@ -274,10 +319,13 @@ function colorRoot() {
   return document.getElementById("now-stack") || document.getElementById("now-card");
 }
 
+function colorTargets() {
+  return [colorRoot(), document.getElementById("portrait-card")].filter(Boolean);
+}
+
 function clearCoverColors() {
-  const card = colorRoot();
-  if (!card) return;
-  ["--np-bg", "--np-accent", "--np-text", "--np-muted", "--np-border"].forEach((k) => card.style.removeProperty(k));
+  const keys = ["--np-bg", "--np-accent", "--np-text", "--np-muted", "--np-border"];
+  colorTargets().forEach((card) => keys.forEach((k) => card.style.removeProperty(k)));
 }
 
 function applyCoverColors(url) {
@@ -324,11 +372,15 @@ function applyCoverColors(url) {
       const s = top ? Math.min(0.75, Math.max(0.35, top.s)) : 0.55;
       const bg = hslToRgb(h, Math.min(0.5, s * 0.85), 0.16);
       const accent = hslToRgb(h, Math.min(0.9, s * 1.15), 0.62);
-      card.style.setProperty("--np-bg", `rgba(${bg.r}, ${bg.g}, ${bg.b}, 0.94)`);
-      card.style.setProperty("--np-accent", `rgb(${accent.r}, ${accent.g}, ${accent.b})`);
-      card.style.setProperty("--np-text", "#ffffff");
-      card.style.setProperty("--np-muted", "#b8bcc4");
-      card.style.setProperty("--np-border", `rgba(${accent.r}, ${accent.g}, ${accent.b}, 0.35)`);
+      const muted = hslToRgb(h, Math.min(0.25, s * 0.35), 0.72);
+      const targets = colorTargets();
+      targets.forEach((el) => {
+        el.style.setProperty("--np-bg", `rgba(${bg.r}, ${bg.g}, ${bg.b}, 0.94)`);
+        el.style.setProperty("--np-accent", `rgb(${accent.r}, ${accent.g}, ${accent.b})`);
+        el.style.setProperty("--np-text", "#ffffff");
+        el.style.setProperty("--np-muted", `rgb(${muted.r}, ${muted.g}, ${muted.b})`);
+        el.style.setProperty("--np-border", `rgba(${accent.r}, ${accent.g}, ${accent.b}, 0.35)`);
+      });
     } catch (e) {
       clearCoverColors();
     }
@@ -340,10 +392,13 @@ function applyCoverColors(url) {
 }
 
 function drawWave() {
-  const canvas = document.getElementById("wave");
-  if (!canvas) return;
-  const card = document.getElementById("now-card");
-  if (card && card.classList.contains("has-lyric")) return;
+  const portrait = overlayStyle() === "portrait";
+  const canvas = portrait
+    ? (window.PortraitCard && PortraitCard.waveCanvas())
+    : document.getElementById("wave");
+  if (!canvas || canvas.hidden) return;
+  const card = portrait ? document.getElementById("portrait-card") : document.getElementById("now-card");
+  if (!portrait && card && card.classList.contains("has-lyric")) return;
   const dpr = window.devicePixelRatio || 1;
   const cssW = canvas.clientWidth || 200;
   const cssH = canvas.clientHeight || 22;
@@ -390,6 +445,7 @@ function loopWave() {
   requestAnimationFrame(loopWave);
 }
 
+if (window.PortraitCard) PortraitCard.init(document.getElementById("portrait-card"));
 connect();
 setInterval(() => { if (state.selection) render(); }, 400);
 loopWave();
@@ -478,6 +534,7 @@ function resetGuideTrack() {
 }
 
 function syncSongGuide() {
+  if (overlayStyle() === "portrait") return;
   const cfg = guideSettings();
   const key = `${cfg.enabled}|${cfg.plays}|${cfg.hideDelay}|${cfg.reappear}|${cfg.speed}`;
   const stack = document.getElementById("now-stack");

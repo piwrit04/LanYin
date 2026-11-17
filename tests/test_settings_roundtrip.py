@@ -262,3 +262,56 @@ def test_overlay_default_size_and_position_values():
     assert settings.DEFAULT_OVERLAY["height"] == 17.4
     assert settings.DEFAULT_OVERLAY["left"] == 6.7
     assert settings.DEFAULT_OVERLAY["bottom"] == 5.0
+
+
+def test_overlay_styles_independent(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+    cfg = settings.load_config()
+    assert cfg["overlay"]["style"] == "classic"
+    assert cfg["overlay"]["width"] == 22.2
+    assert cfg["overlay"]["height"] == 17.4
+    assert cfg["overlay"]["styles"]["portrait"]["width"] == 14.5
+    assert cfg["overlay"]["styles"]["portrait"]["height"] == 32.2
+    assert cfg["overlay"]["styles"]["classic"]["width"] == 22.2
+
+    cfg["overlay"]["style"] = "portrait"
+    cfg["overlay"]["styles"]["portrait"]["width"] = 16
+    cfg["overlay"]["styles"]["portrait"]["height"] = 32
+    cfg["overlay"]["styles"]["portrait"]["show_date"] = False
+    cfg["overlay"]["styles"]["classic"]["guide_enabled"] = False
+    cfg["overlay"]["width"] = 16
+    cfg["overlay"]["height"] = 32
+    cfg["overlay"]["show_date"] = False
+    cfg["overlay"]["guide_enabled"] = False
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["overlay"]["style"] == "portrait"
+    assert again["overlay"]["width"] == 16
+    assert again["overlay"]["height"] == 32
+    assert again["overlay"]["show_date"] is False
+    assert again["overlay"]["styles"]["classic"]["width"] == 22.2
+    assert again["overlay"]["styles"]["classic"]["guide_enabled"] is False
+    assert again["overlay"]["guide_enabled"] is False
+
+    again["overlay"]["style"] = "classic"
+    settings.save_config(again)
+    classic = settings.load_config()
+    assert classic["overlay"]["width"] == 22.2
+    assert classic["overlay"]["height"] == 17.4
+    assert classic["overlay"]["styles"]["portrait"]["width"] == 16
+    assert classic["overlay"]["styles"]["portrait"]["height"] == 32
+
+
+def test_volume_roundtrip(tmp_path, monkeypatch):
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(settings, "CONFIG_PATH", path)
+    cfg = settings.load_config()
+    assert cfg["volume"] == 0.8
+    cfg["volume"] = 0.35
+    settings.save_config(cfg)
+    again = settings.load_config()
+    assert again["volume"] == 0.35
+    cfg["volume"] = 2
+    settings.save_config(cfg)
+    assert settings.load_config()["volume"] == 1.0

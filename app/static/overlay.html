@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>澜音覆盖层</title>
-  <link rel="stylesheet" href="/static/css/common.css?v=36" />
-  <link rel="stylesheet" href="/static/css/overlay.css?v=36" />
+  <link rel="stylesheet" href="/static/css/common.css?v=56" />
+  <link rel="stylesheet" href="/static/css/overlay.css?v=56" />
+  <link rel="stylesheet" href="/static/css/portrait-card.css?v=56" />
 </head>
 <body>
   <div class="stage">
@@ -45,6 +46,39 @@
         </div>
       </div>
     </section>
+
+    <article class="portrait-card is-idle" id="portrait-card">
+      <p class="clock">
+        <span class="clock-date" id="portrait-clock-date">1月1日 星期一</span>
+        <span class="clock-time" id="portrait-clock-time">00:00:00</span>
+      </p>
+      <div class="hero">
+        <section class="slide cover" data-slide="cover">
+          <div class="cover-img" id="portrait-cover"></div>
+        </section>
+        <section class="slide guide is-active" data-slide="guide">
+          <p class="guide-kicker">弹幕点歌</p>
+          <p class="guide-cmd">点歌 <em>歌名</em> [歌手] [平台]</p>
+          <p class="guide-plat">B站 / QQ / 网易云 / 酷狗</p>
+          <p class="guide-eg">例：<strong>点歌 晴天 周杰伦 B站</strong></p>
+        </section>
+      </div>
+      <div class="dots" id="portrait-dots"><span></span><span class="is-on"></span></div>
+      <div class="lyric-slot">
+        <p class="lyric is-empty" id="portrait-lyric">还没有正在播放的歌曲</p>
+        <canvas class="wave" id="portrait-wave" hidden width="256" height="26"></canvas>
+      </div>
+      <div class="bar-row">
+        <span id="portrait-t0">00:00</span>
+        <div class="bar"><span id="portrait-bar"></span></div>
+        <span id="portrait-t1">00:00</span>
+      </div>
+      <div class="meta">
+        <p class="kicker" id="portrait-kicker">等待点歌</p>
+        <p class="title is-wrap" id="portrait-title"><span class="title-text">等待点歌</span></p>
+        <p class="sub" id="portrait-sub">澜音</p>
+      </div>
+    </article>
   </div>
     <section class="queue-card" id="queue-card">
       <h3>待播</h3>
@@ -61,7 +95,8 @@
       <ol id="sel-list"></ol>
     </section>
   </div>
-  <script src="/static/js/common.js?v=36"></script>
-  <script src="/static/js/overlay.js?v=36"></script>
+  <script src="/static/js/common.js?v=56"></script>
+  <script src="/static/js/portrait-card.js?v=56"></script>
+  <script src="/static/js/overlay.js?v=56"></script>
 </body>
 </html>

@@ -129,7 +129,7 @@ class CurrentTrack:
 
     def to_dict(self) -> dict[str, Any]:
         d = self.item.to_dict()
-        d.update({"position": self.position, "paused": self.paused, "has_lyric": bool(self.lyric)})
+        d.update({"position": self.position, "paused": self.paused, "has_lyric": bool(self.lyric), "lyric": self.lyric or ""})
         return d
 
 
