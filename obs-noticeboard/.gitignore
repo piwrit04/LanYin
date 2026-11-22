@@ -1,0 +1,12 @@
+/build*/
+/dist/
+/releases/
+*.zip
+*.exe
+*.dll
+*.lib
+*.pdb
+*.log
+__pycache__/
+/tests/*log*.txt
+/tests/results*/

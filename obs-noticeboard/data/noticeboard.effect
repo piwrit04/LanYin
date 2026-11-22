@@ -1,0 +1,106 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 星澪
+ */
+// 公告板卡片：圆角矩形（带抗锯齿描边）+ 单通道文字着色
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float2 size;
+uniform float4 fill_color;
+uniform float4 border_color;
+uniform float border_width;
+uniform float radius;
+
+uniform float4 text_color;
+uniform float2 uv_scale;
+uniform float2 uv_offset;
+
+sampler_state text_sampler {
+	Filter   = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+VertData VSDefault(VertData v_in)
+{
+	VertData v_out;
+	v_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+	v_out.uv  = v_in.uv;
+	return v_out;
+}
+
+float sd_round_box(float2 p, float2 b, float r)
+{
+	float2 q = abs(p) - b + float2(r, r);
+	return length(max(q, float2(0.0, 0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
+float4 PSCard(VertData v_in) : TARGET
+{
+	float2 half_size = size * 0.5;
+	float2 p = v_in.uv * size - half_size;
+	float r = min(radius, min(half_size.x, half_size.y));
+	float d = sd_round_box(p, half_size, r);
+	float outer = saturate(0.5 - d);
+	float inner = saturate(0.5 - (d + border_width));
+	float ring = border_width > 0.0 ? saturate(outer - inner) : 0.0;
+
+	/* 与 CSS 一致：背景铺满到边框下方，边框再叠在上面 */
+	float a_bg = fill_color.a * outer;
+	float a_bd = border_color.a * ring;
+	float3 pm = border_color.rgb * a_bd + fill_color.rgb * a_bg * (1.0 - a_bd);
+	float a = a_bd + a_bg * (1.0 - a_bd);
+	if (a <= 0.0001)
+		return float4(0.0, 0.0, 0.0, 0.0);
+	return float4(pm / a, a);
+}
+
+float4 PSText(VertData v_in) : TARGET
+{
+	float2 uv = v_in.uv * uv_scale + uv_offset;
+	float cov = image.Sample(text_sampler, uv).r;
+	return float4(text_color.rgb, text_color.a * cov);
+}
+
+technique Card
+{
+	pass
+	{
+		vertex_shader = VSDefault(v_in);
+		pixel_shader  = PSCard(v_in);
+	}
+}
+
+technique Text
+{
+	pass
+	{
+		vertex_shader = VSDefault(v_in);
+		pixel_shader  = PSText(v_in);
+	}
+}
+
+// OBS Scroll filter semantics: +UV samples right/down => visual left/up.
+sampler_state scroll_sampler {
+    Filter = Linear;
+    AddressU = Wrap;
+    AddressV = Wrap;
+};
+float4 PSScroll(VertData v_in) : TARGET
+{
+    float2 uv = v_in.uv * uv_scale + uv_offset;
+    float cov = image.Sample(scroll_sampler, uv).r;
+    return float4(text_color.rgb, text_color.a * cov);
+}
+technique TextScroll
+{
+    pass {
+        vertex_shader = VSDefault(v_in);
+        pixel_shader = PSScroll(v_in);
+    }
+}

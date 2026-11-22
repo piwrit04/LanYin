@@ -22,6 +22,8 @@
 
 介绍片见 [docs/readme/promo.mp4](docs/readme/promo.mp4)。
 
+独立工具：[公告板（OBS 原生来源，1.4.2）](obs-noticeboard/README.md) · 作者星澪；与澜音点歌功能独立。
+
 本程序**不会**破解会员、不会解密加密音频，也不会走第三方「付费歌换源」接口。登录和 Cookie 只保存在你自己的电脑上。
 
 ---
